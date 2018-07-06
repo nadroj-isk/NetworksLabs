@@ -3,7 +3,8 @@ import java.net.*;
 
 class UDPClient{
   public static void main(String[] args) throws Exception {
-      int[] ports = {10028, 10029, 10030, 10031};
+      int[] ports = {10028, 10029, 10030, 10031}; //Group Assigned Port Numbers
+      int port = ports[0];  //must be the same as port in server file
       //use tux050 tux065
 
 
@@ -18,20 +19,20 @@ class UDPClient{
 
       System.out.print("Please type in message to be converted: "); //remove later
 
-      String sentence = inFromUser.readLine();
+      String sentence = inFromUser.readLine();  //gets user input
       sendData = sentence.getBytes();
 
       System.out.println("Sending Packet..."); //remove later
 
-      DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, 10029);
+      DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port); //sends user input to server
       clientSocket.send(sendPacket);
 
       System.out.println("Receiving Packet..."); //remove later
 
-      DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+      DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length); //receieves packet from server
       clientSocket.receive(receivePacket);
 
-      String modifiedSentence = new String(receivePacket.getData());
+      String modifiedSentence = new String(receivePacket.getData());  //pulls data from packet
       System.out.println("FROM SERVER: " + modifiedSentence);
 
       clientSocket.close();
