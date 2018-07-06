@@ -3,27 +3,37 @@ import java.net.*;
 
 class UDPClient{
   public static void main(String[] args) throws Exception {
-      BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in)); //create input string
+      int[] ports = {10028, 10029, 10030, 10031};
+      //use tux050 tux065
+
+
+	  BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in)); //create input string
       DatagramSocket clientSocket = new DatagramSocket(); //create client socket
-      InetAddress IPAddress = InetAddress.getByName("hostname"); //translate hostname to IP address using DNS
+
+      String localhost = InetAddress.getLocalHost().getHostAddress().trim();
+      InetAddress IPAddress = InetAddress.getByName("131.204.14.50"); //translate hostname to IP address using DNS
 
       byte[] sendData = new byte[1024];
       byte[] receiveData = new byte[1024];
 
+      System.out.print("Please type in message to be converted: "); //remove later
+
       String sentence = inFromUser.readLine();
       sendData = sentence.getBytes();
 
-      DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, 9876);
+      System.out.println("Sending Packet..."); //remove later
 
+      DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, 10029);
       clientSocket.send(sendPacket);
 
-      DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+      System.out.println("Receiving Packet..."); //remove later
 
+      DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
       clientSocket.receive(receivePacket);
 
       String modifiedSentence = new String(receivePacket.getData());
+      System.out.println("FROM SERVER: " + modifiedSentence);
 
-      System.out.println("FROM SERVER" + modifiedSentence);
       clientSocket.close();
     }
-  }
+}
