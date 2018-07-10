@@ -5,7 +5,7 @@ class TCPClient{
   public static void main(String[] args) throws Exception {
     String sentence;
     String modifiedSentence;
-    String hostname = "hostname";
+    String hostname = "ENIAC";
     int port = 6789;
 
     //Create input stream
