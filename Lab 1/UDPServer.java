@@ -61,8 +61,9 @@ public class UDPServer {
 					//skips the GET part of the HTTP request message
 					readFileIn.next();
 		      //skips delimiter patterns and scans the data for the next complete token
-		      String fileName = readFileIn.next(); //checks for Null space in filename and if there is then file closes
-		      //closes the file
+		      String fileName = "C:\\Users\\Jordan\\Documents\\GitHub\\NetworksLabs\\lab 1\\";
+              fileName += readFileIn.next(); //checks for Null space in filename and if there is then file closes
+              //closes the file
 		      readFileIn.close();
 
 		      //Once file name is correct then a new file is initiated
@@ -94,6 +95,13 @@ public class UDPServer {
 		    	  packetNumber++;
 		    	  System.out.println("Sending Packet " + packetNumber + " of " + PacketList.size());
 		      }
+
+		      String nullByte = "\0";
+              byte[] nullData = nullByte.getBytes();
+              DatagramPacket finalPacket = new DatagramPacket(nullData, nullData.length, IPAddress, portRecieve);  //sends data back to client
+              serverSocket.send(finalPacket);
+
+              System.out.println("Sending Final Packet");
 			}
 	}
 	  public static ArrayList<Packet> Segmentation(byte[] fileBytes) {
@@ -105,7 +113,7 @@ public class UDPServer {
 
 		  int byteCounter = 0;
 		  int segmentNumber = 0;
-		  while (byteCounter > fileLength) {
+		  while (byteCounter < fileLength) {
 			  Packet nextPacket = new Packet();
 			  byte[] nextPacketData = new byte[PACKET_DATA_SIZE];
 			  //read in amount of data size
@@ -138,11 +146,11 @@ public class UDPServer {
 			  byteCounter = byteCounter + readInDataSize;
 
 		  }
-			Packet nullPacket = new Packet();
+			/*Packet nullPacket = new Packet();
 			byte[] nullPacketData = {'\0'};
 			nullPacket.setPacketData(nullPacketData);
 
-			returnPacket.add(nullPacket);
+			returnPacket.add(nullPacket);*/
 		  return returnPacket;
 
 	  }

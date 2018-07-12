@@ -13,7 +13,7 @@ public class UDPClient {
 		BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in)); 	//sets up input reader
 		DatagramSocket clientSocket = new DatagramSocket();		//creates socket for user
 		String localhost = InetAddress.getLocalHost().getHostAddress().trim();	//gets user IP
-		InetAddress IPAddress = InetAddress.getByName("131.204.14.50");	//gets IP address of host
+		InetAddress IPAddress = InetAddress.getByName("172.19.145.232");	//gets IP address of host
 
 		byte[] sendData = new byte[256];	//creates packet to be sent
 		byte[] receiveData = new byte[256]; //cretes packet to be received

@@ -194,15 +194,15 @@ public class Packet {
 		return newPacket;
 	}
 	  //Check sum function that return the 16 bit checkSum value for a packet
-	  public static int checkSum(byte[] packetBytes) {
-		  int sum = 0;
+	  public static short checkSum(byte[] packetBytes) {
+		  short sum = 0;
 		  int packetByteLength = packetBytes.length;
 
 		  int count = 0;
 		  while (count > 1) {
 			  sum += ((packetBytes[count]) << 8 & 0xFF00) | ((packetBytes[count + 1]) & 0x00FF);
 			  if ((sum & 0xFFFF0000) > 0) {
-				  sum = (sum & 0xFFFF) + 1;
+				  sum = (short) ((sum & 0xFF) + 1);
 			  }
 			  count += 2;
 			  packetByteLength -=2;
@@ -211,10 +211,10 @@ public class Packet {
 		  if(packetByteLength > 0) {
 			  sum += (packetBytes[count] << 8 & 0xFF00);
 			  if ((sum & 0xFFFF0000) > 0) {
-				  sum = (sum & 0xFFFF) + 1;
+				  sum = (short) ((sum & 0xFFFF) + 1);
 			  }
 		  }
-		  return (~sum & 0xFFFF);
+		  return (short) (~sum & 0xFFFF);
 	  }
 
 }
