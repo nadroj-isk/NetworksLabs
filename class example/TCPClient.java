@@ -1,12 +1,17 @@
 import java.io.*;
 import java.net.*;
 
+// Must run TCPServer first. If running on tux both client and server Must
+// be running on tux
+
 class TCPClient{
   public static void main(String[] args) throws Exception {
     String sentence;
     String modifiedSentence;
-    String hostname = "ENIAC";
-    int port = 6789;
+    String hostname = "ENIAC";   //use tux050 tux065
+    int[] ports = {10028, 10029, 10030, 10031}; //Group Assigned Port Numbers
+    int port = ports[0];  //must be the same as port in server file
+
 
     //Create input stream
     BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in));
@@ -32,6 +37,5 @@ class TCPClient{
     System.out.println("FROM SERVER: " + modifiedSentence);
 
     clientSocket.close();
-
   }
 }

@@ -10,5 +10,5 @@ clientSocket.sendto(message, (serverName, serverPort))
 modifiedMessage, serverAddress = clientSocket.recvfrom(bufferSize)
 
 print modifiedMessage
-#print serverAddress
+print serverAddress
 clientSocket.close()
