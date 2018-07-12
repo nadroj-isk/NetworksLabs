@@ -1,7 +1,7 @@
 import java.io.*;
 import java.net.*;
 
-class UDPClient{
+class Class_UDPClient{
   public static void main(String[] args) throws Exception {
       int[] ports = {10028, 10029, 10030, 10031}; //Group Assigned Port Numbers
       int port = ports[0];  //must be the same as port in server file

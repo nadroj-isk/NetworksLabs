@@ -1,7 +1,7 @@
 import java.io.*;
 import java.net.*;
 
-class TCPServer{
+class Class_TCPServer{
   public static void main(String[] args) throws Exception{
     String clientSentence;
     String capitalizedSentence;

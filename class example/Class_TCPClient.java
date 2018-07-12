@@ -4,7 +4,7 @@ import java.net.*;
 // Must run TCPServer first. If running on tux both client and server Must
 // be running on tux
 
-class TCPClient{
+class Class_TCPClient{
   public static void main(String[] args) throws Exception {
     String sentence;
     String modifiedSentence;

@@ -1,7 +1,7 @@
 import java.io.*;
 import java.net.*;
 
-class UDPServer{
+class Class_UDPServer{
   public static void main(String[] args) throws Exception {
       int[] ports = {10028, 10029, 10030, 10031};
       int port = ports[0];
