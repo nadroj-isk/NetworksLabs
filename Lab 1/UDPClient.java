@@ -18,9 +18,9 @@ public class UDPClient {
         //BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in)); 	//not used anymore because we use TestFile
         DatagramSocket clientSocket = new DatagramSocket();        //creates socket for user
         String localhost = InetAddress.getLocalHost().getHostAddress().trim();    //gets user IP
-        InetAddress IPAddress = InetAddress.getByName("172.19.145.232");    //gets IP address of host
+        InetAddress IPAddress = InetAddress.getByName("172.17.107.147");    //gets IP address of host
 
-        byte[] sendData = new byte[256];    //creates packet to be sent
+        byte[] sendData;    //creates packet to be sent
         byte[] receiveData = new byte[256]; //creates packet to be received
         String GremlinProbability = "0.0";
         boolean DataDoneSending = false;
@@ -56,11 +56,11 @@ public class UDPClient {
             //if it is then that means the data is done sending and it will break out of the loop
             if (createReceivedPacket.GETPacketData()[0] == '\0') {
                 DataDoneSending = true;
-                break;
             }
-
-            //received packets are added to the packet array
-            receivedPackets.add(createReceivedPacket);
+            else {
+                //received packets are added to the packet array
+                receivedPackets.add(createReceivedPacket);
+            }
         }
 
         //using command line arguments to detect Gremlin probability
@@ -69,7 +69,6 @@ public class UDPClient {
         System.out.println("Gremlin...");
         if (args.length == 0) {
             System.out.println("There are no arguments detected for Gremlin Probability");
-            DataDoneSending = true;
         } else {
             //if there is arguments then set the Gremlin Probability to these
             GremlinProbability = args[0];
@@ -87,7 +86,7 @@ public class UDPClient {
         //Reassembles Packets that were received
         byte[] ReassemblePacketFile = Packet.ReassemblePacket(receivedPackets);
         String modifiedPacketData = new String(ReassemblePacketFile);
-        System.out.println("Packet Data Received from UDPServer:" + modifiedPacketData);
+        System.out.println("Packet Data Received from UDPServer:\n" + modifiedPacketData);
         clientSocket.close();
 
         //Display packets using a Web browser

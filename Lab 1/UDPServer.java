@@ -63,7 +63,7 @@ public class UDPServer {
             //skips the GET part of the HTTP request message to just read in the TestFile
             readFileIn.next();
             //skips delimiter patterns and scans the data for the next complete token
-            String fileName = "C:\\Users\\Jordan\\Documents\\GitHub\\NetworksLabs\\Lab 1\\" + readFileIn.next(); //checks for Null space in filename and if there is then file closes
+            String fileName = "C:\\Users\\jsosn\\IdeaProjects\\lab1\\src\\" + readFileIn.next(); //checks for Null space in filename and if there is then file closes
             //closes the file
             readFileIn.close();
 
@@ -98,9 +98,10 @@ public class UDPServer {
             }
             //checks to see if the final packet being sent is null and then send the final packet
             String nullByte = "\0";
-            byte[] nullData = nullByte.getBytes();
-            DatagramPacket finalPacket = new DatagramPacket(nullData, nullData.length, IPAddress, portRecieve);  //sends data back to client
-            serverSocket.send(finalPacket);
+            //byte[] nullData = nullByte.getBytes();
+            ArrayList<Packet> nullpacket = Packet.Segmentation(nullByte.getBytes());
+            DatagramPacket nullDatagram = nullpacket.get(0).getDatagramPacket(IPAddress, portRecieve);
+            serverSocket.send(nullDatagram);
             System.out.println("Sending Final Packet");
         }
     }
