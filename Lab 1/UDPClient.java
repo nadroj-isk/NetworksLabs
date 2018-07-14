@@ -7,18 +7,16 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Random;
 
+//use tux050 tux065
+
 public class UDPClient {
 
     public static void main(String args[]) throws Exception {
         int[] ports = {10028, 10029, 10030, 10031}; //Group Assigned Port Numbers
-        int port = ports[0];  //must be the same as port in server file
-        //use tux050 tux065
+        int port = ports[0];
 
-
-        //BufferedReader inFromUser = new BufferedReader(new InputStreamReader(System.in)); 	//not used anymore because we use TestFile
         DatagramSocket clientSocket = new DatagramSocket();        //creates socket for user
-        String localhost = InetAddress.getLocalHost().getHostAddress().trim();    //gets user IP
-        InetAddress IPAddress = InetAddress.getByName("172.17.107.147");    //gets IP address of host
+        InetAddress IPAddress = InetAddress.getByName("172.17.107.147");    //gets IP address of Server
 
         byte[] sendData;    //creates packet to be sent
         byte[] receiveData = new byte[256]; //creates packet to be received
@@ -30,22 +28,21 @@ public class UDPClient {
         String TestFile = "GET TestFile.html HTTP/1.0";
         sendData = TestFile.getBytes();
 
+        //sends request to server
         DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
         clientSocket.send(sendPacket);
 
         System.out.println("Sending request packet...."); //notify user of sending
 
         // ********** RECEIVING PACKETS **********
-
         System.out.println("Receiving packets...");
 
         DatagramPacket receivePacket; //Declares the Datagram packet for receive packet
-        ArrayList<Packet> receivedPackets = new ArrayList<Packet>(); //create a new array of packets received
-        while (DataDoneSending == false) { //check to see if the packet is done sending//check to see if the packet is done sending
+        ArrayList<Packet> receivedPackets = new ArrayList<>(); //create a new array of packets received
+        while (!DataDoneSending ) { //check to see if the data is done sending to host
 
             receivePacket = new DatagramPacket(receiveData, receiveData.length); //creates a null datagram packet
             clientSocket.receive(receivePacket); //receives the actual packet from the server
-
 
             //create a packet from the data received
             Packet createReceivedPacket = Packet.CreatePacket(receivePacket);
@@ -56,10 +53,8 @@ public class UDPClient {
             //if it is then that means the data is done sending and it will break out of the loop
             if (createReceivedPacket.GETPacketData()[0] == '\0') {
                 DataDoneSending = true;
-            }
-            else {
-                //received packets are added to the packet array
-                receivedPackets.add(createReceivedPacket);
+            } else {
+                receivedPackets.add(createReceivedPacket); //received packets are added to the packet array
             }
         }
 
@@ -92,24 +87,19 @@ public class UDPClient {
         //Display packets using a Web browser
         int index = modifiedPacketData.lastIndexOf("\r\n", 100);
         modifiedPacketData = modifiedPacketData.substring(index);
-        //gets the operating system name
-        System.out.println(System.getProperty("os.name"));
-        //if using windows then need to change "MAC" to Windows----- from Stack Overflow
-        if (System.getProperty("os.name").startsWith("MAC")) {
-            //creates a temporary TestFile
-            File TestFileTemp = File.createTempFile("TestFile", ".html");
-            FileWriter writer = new FileWriter(TestFileTemp);
-            writer.write(modifiedPacketData);
-            writer.close();
-            //opens the test file on the desktop
-            Desktop desk = Desktop.getDesktop();
-            desk.open(TestFileTemp);
-        }
 
+        //creates a temporary TestFile
+        File TestFileTemp = File.createTempFile("TestFile", ".html");
+        FileWriter writer = new FileWriter(TestFileTemp);
+        writer.write(modifiedPacketData);
+        writer.close();
+        //opens the test file on the desktop
+        Desktop desk = Desktop.getDesktop();
+        desk.open(TestFileTemp);
 
     }
 
-    //Gremlin function
+    //Gremlin function TODO
     private static void Gremlin(String probOfDamage, Packet receivedPacket) {
         Random random = new Random();
         //pick a random number
@@ -118,16 +108,16 @@ public class UDPClient {
         int bytesToChange;
         if (howManyRand <= 50) {
             bytesToChange = 1;
-        } else if (50 < howManyRand && howManyRand <= 80) {
+        } else if (howManyRand <= 80) {
             bytesToChange = 2;
         } else bytesToChange = 3;
-        //pick a
         double damagedProbability = Double.parseDouble(probOfDamage) * 100;
+        System.out.println(bytesToChange);
         if (dmgRand <= damagedProbability) {
             for (int i = 0; i <= bytesToChange; i++) {
                 byte[] data = receivedPacket.GETPacketData();
                 int byteToCorrupt = random.nextInt(receivedPacket.getPacketDataSize()); // pick a random byte
-                data[byteToCorrupt] = (byte) (~data[byteToCorrupt] | 0xFF); // flip the bits in that byte
+                data[byteToCorrupt] = (byte) ~data[byteToCorrupt]; // flip the bits in that byte
             }
 
         }
@@ -135,13 +125,13 @@ public class UDPClient {
 
     //ErrorDetection
     private static boolean ErrorDetection(ArrayList<Packet> PacketList) {
-        for (int i = 0; i < PacketList.size(); i++) {
-            String strReceivedCheckSum = PacketList.get(i).getHeaderValue(Packet.HEADER_ELEMENTS.CHECKSUM);
+        for (Packet aPacketList : PacketList) {
+            String strReceivedCheckSum = aPacketList.getHeaderValue(Packet.HEADER_ELEMENTS.CHECKSUM);
             Short receivedCheckSum = Short.parseShort(strReceivedCheckSum);
 
-            byte[] data = PacketList.get(i).GETPacketData();
-            int calcCheckSum = Packet.CheckSum(data);
-            System.out.println("Post-Gremlin checksum: " + String.valueOf(calcCheckSum));
+            byte[] data = aPacketList.GETPacketData();
+            short calcCheckSum = Packet.CheckSum(data);
+            //System.out.println("Post-Gremlin checksum: " + String.valueOf(calcCheckSum));
             if (!receivedCheckSum.equals(calcCheckSum))
                 return true;
         }
