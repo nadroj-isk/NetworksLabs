@@ -112,7 +112,6 @@ public class UDPClient {
             bytesToChange = 2;
         } else bytesToChange = 3;
         double damagedProbability = Double.parseDouble(probOfDamage) * 100;
-        System.out.println(bytesToChange);
         if (dmgRand <= damagedProbability) {
             for (int i = 0; i <= bytesToChange; i++) {
                 byte[] data = receivedPacket.GETPacketData();

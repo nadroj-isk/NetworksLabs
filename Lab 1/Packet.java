@@ -118,13 +118,14 @@ class Packet {
 
     /////////////////////////PACKAGE HEADER METHODS//////////////////////////////////
 
+    //TODO look into this. Compiler says (1) and (2) wont ever execute
     //Check sum function that return the 16 bit checkSum value for a packet
     static short CheckSum(byte[] packetBytes) {
         short sum = 0;
         int packetByteLength = packetBytes.length;
 
         int count = 0;
-        while (count > 1) {
+        while (count > 1) { //TODO (1)
             sum += ((packetBytes[count]) << 8 & 0xFF00) | ((packetBytes[count + 1]) & 0x00FF);
             if ((sum & 0xFFFF0000) > 0) {
                 sum = (short) ((sum & 0xFFFF) + 1);
@@ -135,7 +136,7 @@ class Packet {
 
         if (packetByteLength > 0) {
             sum += (packetBytes[count] << 8 & 0xFF00);
-            if ((sum & 0xFFFF0000) > 0) {
+            if ((sum & 0xFFFF0000) > 0) { //TODO (2)
                 sum = (short) ((sum & 0xFFFF) + 1);
             }
         }
