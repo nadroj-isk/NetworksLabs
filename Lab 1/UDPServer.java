@@ -45,7 +45,7 @@ public class UDPServer {
             readFileIn = new Scanner(dataFromClient);
 
             readFileIn.next(); //skips the GET command of the HTTP request message to just read in the TestFile
-            String fileName = "C:\\Users\\jsosn\\IdeaProjects\\lab1\\src\\" + readFileIn.next(); //checks for Null space in filename and if there is then file closes TODO
+            String fileName = readFileIn.next(); //checks for Null space in filename and if there is then file closes TODO
             readFileIn.close(); //closes the file
 
 
