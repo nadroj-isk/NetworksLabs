@@ -88,14 +88,16 @@ public class UDPClient {
         int index = modifiedPacketData.lastIndexOf("\r\n", 100);
         modifiedPacketData = modifiedPacketData.substring(index);
 
-        //creates a temporary TestFile
-        File TestFileTemp = File.createTempFile("TestFile", ".html");
-        FileWriter writer = new FileWriter(TestFileTemp);
-        writer.write(modifiedPacketData);
-        writer.close();
-        //opens the test file on the desktop
-        Desktop desk = Desktop.getDesktop();
-        desk.open(TestFileTemp);
+        if(!System.getProperty("os.name").equals("Linux")) {
+            //creates a temporary TestFile
+            File TestFileTemp = File.createTempFile("TestFile", ".html");
+            FileWriter writer = new FileWriter(TestFileTemp);
+            writer.write(modifiedPacketData);
+            writer.close();
+            //opens the test file on the desktop
+            Desktop desk = Desktop.getDesktop();
+            desk.open(TestFileTemp);
+        }
 
     }
 
