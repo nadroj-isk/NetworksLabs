@@ -5,7 +5,13 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Scanner;
 
-
+/** UDPServer Class
+ * Runs on Server machine to send HTML files to Client
+ * Compile using java UDPServer
+ * Use tux050 - tux065 when running
+ * @author Stephanie Parrish, Jordan Sosnowski, Marcus Woodard
+ * @version 7.15.18
+ */
 public class UDPServer {
 
     public static void main(String args[]) throws Exception {
@@ -25,7 +31,7 @@ public class UDPServer {
         Scanner readFileIn;  //Create an instance of the Scanner class so files can be read in
 
         while (true) {
-
+            System.out.println("Ready to Receive Transmission...");
             StringBuilder fileDataContents = new StringBuilder();   //variable for the file data contents
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length); //Creates a new datagram
             serverSocket.receive(receivePacket);
@@ -84,6 +90,13 @@ public class UDPServer {
         }
     }
 
+    /** setNullPacket
+     * Creates null packet to send to client to signify end of transmission
+     *
+     * @param IPAddress: IP Address of Client
+     * @param portReceive: Port of Client
+     * @return returns Null Datagram Packet to send to Client
+     */
     private static DatagramPacket setNullPacket(InetAddress IPAddress, int portReceive){
         String nullByte = "\0";
         ArrayList<Packet> nullPacket = Packet.Segmentation(nullByte.getBytes());    //null packet changed to full 256 bit size, but only contains 1 bit of info

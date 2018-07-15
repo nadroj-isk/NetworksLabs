@@ -7,17 +7,25 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Random;
 
-
-//use tux050 tux065
-
+/** UDPClient Class.
+ * Runs on Client machine to request HTML files from Server
+ * Compile using java UDPClient <chanceOfCorruption>
+ *
+ * Use tux050 - tux065 when running on tux,
+ * Make sure to change IPADDRESSOFSERVER to the correct IP
+ *
+ * @author Stephanie Parrish, Jordan Sosnowski, Marcus Woodard
+ * @version 7.15.18
+*/
 public class UDPClient {
 
     public static void main(String args[]) throws Exception {
+        final String IPADDRESSOFSERVER = "172.19.144.73";
         int[] ports = {10028, 10029, 10030, 10031}; //Group Assigned Port Numbers
         int port = ports[0];
 
         DatagramSocket clientSocket = new DatagramSocket();        //creates socket for user
-        InetAddress IPAddress = InetAddress.getByName("172.19.144.73");    //gets IP address of Server
+        InetAddress IPAddress = InetAddress.getByName(IPADDRESSOFSERVER);    //gets IP address of Server
 
         byte[] sendData;    //creates packet to be sent
         byte[] receiveData = new byte[256]; //creates packet to be received
@@ -26,8 +34,8 @@ public class UDPClient {
         int packetNumber = 0;
 
         // ********** SENDING DATA **********
-        String TestFile = "GET TestFile.html HTTP/1.0";
-        sendData = TestFile.getBytes();
+        String TestFile = "GET TestFile.html HTTP/1.0"; //request to be sent to Server
+        sendData = TestFile.getBytes(); //gets request in byte form
 
         //sends request to server
         DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
@@ -63,7 +71,7 @@ public class UDPClient {
             }
         }
 
-        //using command line arguments to detect Gremlin probability
+        //use command line arguments to detect Gremlin probability
         //checks for no arguments and if there are none then notify user and
         //set the DataDoneSending to true
         System.out.println("Gremlin...");
@@ -93,6 +101,7 @@ public class UDPClient {
         int index = modifiedPacketData.lastIndexOf("\r\n", 100);
         modifiedPacketData = modifiedPacketData.substring(index);
 
+        //if running on Tux don't display HTML on browser since it will crash
         if(!System.getProperty("os.name").equals("Linux")) {
             //creates a temporary TestFile
             File TestFileTemp = File.createTempFile("TestFile", ".html");
@@ -106,20 +115,28 @@ public class UDPClient {
 
     }
 
-    //Gremlin function
+    /**Gremlin function
+     * Gremlin will damage bits depending on runtime user argument, number of bits also depends on probability
+     * P(1 byte damaged) = 50%
+     * P(2 bytes damaged) = 30%
+     * P(3 bytes damaged) = 20%
+     *
+     * @param probOfDamage: probability that a bit will be damaged
+     * @param receivedPacket: packet to be damaged by gremlin
+     **/
     private static void Gremlin(String probOfDamage, Packet receivedPacket) {
         Random random = new Random();
-        //pick a random number
-        int dmgRand = random.nextInt(100) + 1;
-        int howManyRand = random.nextInt(100) + 1;
+
+        int dmgRand = random.nextInt(100) + 1; //pick a random number between 1 - 100
+        int howManyRand = random.nextInt(100) + 1; //pick a random number between 1 - 100
         int bytesToChange;
-        if (howManyRand <= 50) {
+        if (howManyRand <= 50) {    //Change only 1 Byte
             bytesToChange = 1;
-        } else if (howManyRand <= 80) {
+        } else if (howManyRand <= 80) { //Change 2 Bytes
             bytesToChange = 2;
-        } else bytesToChange = 3;
+        } else bytesToChange = 3; //Change 3 Bytes
         double damagedProbability = Double.parseDouble(probOfDamage) * 100;
-        if (dmgRand <= damagedProbability) {
+        if (dmgRand <= damagedProbability) { //if probability to change bytes is hit
             for (int i = 0; i <= bytesToChange; i++) {
                 byte[] data = receivedPacket.GETPacketData();
                 int byteToCorrupt = random.nextInt(receivedPacket.getPacketDataSize()); // pick a random byte
@@ -129,7 +146,12 @@ public class UDPClient {
         }
     }
 
-    //ErrorDetection
+    /**ErrorDetection function
+     * Detects if packet was damaged by Gremlin function
+     *
+     * @param PacketList: list of packets received by Client
+     * @return True if packets are damaged, false if they aren't
+     */
     private static boolean ErrorDetection(ArrayList<Packet> PacketList) {
         for (Packet aPacketList : PacketList) {
             String strReceivedCheckSum = aPacketList.getHeaderValue(Packet.HEADER_ELEMENTS.CHECKSUM);
@@ -138,10 +160,9 @@ public class UDPClient {
             byte[] data = aPacketList.GETPacketData();
             short calcCheckSum = Packet.CheckSum(data);
             //System.out.println("Post-Gremlin checksum: " + String.valueOf(calcCheckSum));
-            if (!receivedCheckSum.equals(calcCheckSum))
+            if (!receivedCheckSum.equals(calcCheckSum)) //Checks to see if packets prior checksum is equal to current checksum
                 return true;
         }
-
         return false;
     }
 
