@@ -20,7 +20,7 @@ import java.util.Random;
 public class UDPClient {
 
     public static void main(String args[]) throws Exception {
-        final String IPADDRESSOFSERVER = "172.19.144.73";
+        final String IPADDRESSOFSERVER = "192.168.56.1";
         int[] ports = {10028, 10029, 10030, 10031}; //Group Assigned Port Numbers
         int port = ports[0];
 
@@ -74,7 +74,7 @@ public class UDPClient {
         //use command line arguments to detect Gremlin probability
         //checks for no arguments and if there are none then notify user and
         //set the DataDoneSending to true
-        System.out.println("Gremlin...");
+        System.out.println("Running Gremlin...");
         if (args.length == 0) {
             System.out.println("There are no arguments detected for Gremlin Probability");
         } else {
@@ -88,9 +88,8 @@ public class UDPClient {
         }
 
         //Check for error detection in the received packets
-        if (ErrorDetection(receivedPackets)) {
-            System.out.println("There were errors detected in packet received.");
-        }
+        ErrorDetection(receivedPackets);
+
         //Reassembles Packets that were received
         byte[] ReassemblePacketFile = Packet.ReassemblePacket(receivedPackets);
         String modifiedPacketData = new String(ReassemblePacketFile);
@@ -147,23 +146,20 @@ public class UDPClient {
     }
 
     /**ErrorDetection function
-     * Detects if packet was damaged by Gremlin function
+     * Detects if packet was damaged by Gremlin function, prints packet number of corrupted packet
      *
      * @param PacketList: list of packets received by Client
-     * @return True if packets are damaged, false if they aren't
      */
-    private static boolean ErrorDetection(ArrayList<Packet> PacketList) {
+    private static void ErrorDetection(ArrayList<Packet> PacketList) {
         for (Packet aPacketList : PacketList) {
             String strReceivedCheckSum = aPacketList.getHeaderValue(Packet.HEADER_ELEMENTS.CHECKSUM);
             Short receivedCheckSum = Short.parseShort(strReceivedCheckSum);
 
             byte[] data = aPacketList.GETPacketData();
             short calcCheckSum = Packet.CheckSum(data);
-            //System.out.println("Post-Gremlin checksum: " + String.valueOf(calcCheckSum));
             if (!receivedCheckSum.equals(calcCheckSum)) //Checks to see if packets prior checksum is equal to current checksum
-                return true;
+                System.out.println("Error detected in Packet Number: " + aPacketList.getHeaderValue(Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
         }
-        return false;
     }
 
 }
