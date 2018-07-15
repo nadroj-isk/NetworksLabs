@@ -1,12 +1,18 @@
-import java.net.DatagramPacket;
-import java.net.InetAddress;
+import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * This class contains the methods used for packets including creating a packet, getting packet data,
+ * getting/setting the packet header, getting/setting the packet segment number, segmentation, re-assembly,
+ * and the check sum function
+ * 
+ * @author StephanieParrish, Jordan Sosnowski, and Marcus Woodard
+ * @version 7/15/2018
+ */
 
-//This class contains the methods that are related to packets including Segmentation, Reassembly, and CheckSum
 class Packet {
 
     ///////Package Header///////
@@ -31,17 +37,20 @@ class Packet {
         PacketHeader = new HashMap<>();
     }
 
-    //Reassemble Packet function called by the UDPClient
+    //Reassemble Packet function called by the UDPClient. Takes in the list of segmented packets and re-assembles them.
     static byte[] ReassemblePacket(ArrayList<Packet> PacketList) {
         int totalSize = 0;
+        //gets packet data size for each of the segmented packets
         for (Packet aPacketList : PacketList) totalSize += aPacketList.getPacketDataSize();
-
+        //creates a byte that will contain the total size for the final returned packet
         byte[] returnPacket = new byte[totalSize];
         int returnCounter = 0;
         for (int i = 0; i < PacketList.size(); i++) {
             //Search the packetList for each packet
             for (Packet FindPacket : PacketList) {
+            	//gets packet by segment number
                 String segmentNumber = FindPacket.getHeaderValue(HEADER_ELEMENTS.SEGMENT_NUMBER);
+                //gets the packet data size and data that match the segment number found
                 if (Integer.parseInt(segmentNumber) == i) {
                     for (int k = 0; k < FindPacket.getPacketDataSize(); k++)
                         returnPacket[returnCounter + k] = FindPacket.GETPacketData(k);
@@ -50,30 +59,34 @@ class Packet {
                 }
             }
         }
-
+        //returns the packet that has been re-assembled
         return returnPacket;
     }
 
     //Segmentation is called by the UDPServer to break the packets into segments
     static ArrayList<Packet> Segmentation(byte[] fileBytes) {
+    	//creates an empty array list for the newly segmented packets
         ArrayList<Packet> returnPacket = new ArrayList<>();
+        //gets the fileBytes length
         int fileLength = fileBytes.length;
+        //if the file has a length zero then throws an error saying the file is empty
         if (fileLength == 0) {
             throw new IllegalArgumentException("File Empty");
         }
-
         int byteCounter = 0;
         int segmentNumber = 0;
+        //checks the fileLength against the byte counter. 
+        //As long as the byteCounter is less than the file length a new packet will be created of size 252
         while (byteCounter < fileLength) {
             Packet nextPacket = new Packet();
             byte[] nextPacketData = new byte[PACKET_DATA_SIZE];
-            //read in amount of data size
+            //read in amount of data size 256 (total) - 4 (header) = 252 (data)
             int readInDataSize = PACKET_DATA_SIZE; //only allows 252 bytes since the other 4 are for the header
-
+            //as long as the file length - the number of bytes counted is less than 252 
+            //then more data is added to the packet segment
             if (fileLength - byteCounter < PACKET_DATA_SIZE) {
                 readInDataSize = fileLength - byteCounter;
             }
-
             //copy the file data
             int j = byteCounter;
             for (int i = 0; i < readInDataSize; i++) {
@@ -105,39 +118,41 @@ class Packet {
     //Creates a new packet
     static Packet CreatePacket(DatagramPacket packet) {
         Packet newPacket = new Packet();
-        ByteBuffer bytebuffer = ByteBuffer.wrap(packet.getData());
-        newPacket.setHeaderValue(HEADER_ELEMENTS.SEGMENT_NUMBER, bytebuffer.getShort() + "");
-        newPacket.setHeaderValue(HEADER_ELEMENTS.CHECKSUM, bytebuffer.getShort() + "");
-
-        byte[] PacketData = packet.getData();
-        byte[] remaining = new byte[PacketData.length - bytebuffer.position()];
-        System.arraycopy(PacketData, bytebuffer.position(), remaining, 0, remaining.length);
-        newPacket.setPacketData(remaining);
-        return newPacket;
+        ByteBuffer bytebuffer = ByteBuffer.wrap(packet.getData()); //wraps the byte array into the buffer
+        newPacket.setHeaderValue(HEADER_ELEMENTS.SEGMENT_NUMBER, bytebuffer.getShort() + ""); //sets header segment number
+        newPacket.setHeaderValue(HEADER_ELEMENTS.CHECKSUM, bytebuffer.getShort() + ""); //sets header checksum
+        byte[] PacketData = packet.getData(); //gets the packet data
+        byte[] remaining = new byte[PacketData.length - bytebuffer.position()]; //subtracts the package data length from the byte buffer position
+        //copies  an array from the specified source array, beginning at the specified position, to the specified position of the destination array
+        System.arraycopy(PacketData, bytebuffer.position(), remaining, 0, remaining.length); 
+        newPacket.setPacketData(remaining); //sets the packet data
+        return newPacket; //returns the newly created packet
     }
 
     /////////////////////////PACKAGE HEADER METHODS//////////////////////////////////
 
-    //TODO look into this. Compiler says (1) and (2) wont ever execute
     //Check sum function that return the 16 bit checkSum value for a packet
     static short CheckSum(byte[] packetBytes) {
         long sum = 0;
+        //gets length of the packetBytes Array
         int packetByteLength = packetBytes.length;
-
         int count = 0;
-        while (packetByteLength > 1) { //TODO (1)
+        while (packetByteLength > 1) { //while the length is greater than 1 then the bits will be shifted left 
         	//get the packetByte in the array of the count shift it left 8 bits
             sum += ((packetBytes[count]) << 8 & 0xFF00) | ((packetBytes[count + 1]) & 0x00FF);
+            //if a carry occurred then it is wrapped around
             if ((sum & 0xFFFF0000) > 0) {
                 sum = ((sum & 0xFFFF) + 1);
             }
+            //increase count by 2
+            //decrease packet byte length by 2
             count += 2;
             packetByteLength -= 2;
         }
 
         if (packetByteLength > 0) {
             sum += (packetBytes[count] << 8 & 0xFF00);
-            if ((sum & 0xFFFF0000) > 0) { //TODO (2)
+            if ((sum & 0xFFFF0000) > 0) { 
                 sum = ((sum & 0xFFFF) + 1);
             }
         }
@@ -175,7 +190,7 @@ class Packet {
         }
     }
 
-
+    //gets the packet data at an index
     private byte GETPacketData(int index) {
         if (index >= 0 && index < PackageData.length)
             return PackageData[index];
@@ -224,5 +239,4 @@ class Packet {
         SEGMENT_NUMBER,
         CHECKSUM
     }
-
 }
