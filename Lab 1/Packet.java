@@ -121,14 +121,15 @@ class Packet {
     //TODO look into this. Compiler says (1) and (2) wont ever execute
     //Check sum function that return the 16 bit checkSum value for a packet
     static short CheckSum(byte[] packetBytes) {
-        short sum = 0;
+        long sum = 0;
         int packetByteLength = packetBytes.length;
 
         int count = 0;
-        while (count > 1) { //TODO (1)
+        while (packetByteLength > 1) { //TODO (1)
+        	//get the packetByte in the array of the count shift it left 8 bits
             sum += ((packetBytes[count]) << 8 & 0xFF00) | ((packetBytes[count + 1]) & 0x00FF);
             if ((sum & 0xFFFF0000) > 0) {
-                sum = (short) ((sum & 0xFFFF) + 1);
+                sum = ((sum & 0xFFFF) + 1);
             }
             count += 2;
             packetByteLength -= 2;
@@ -137,9 +138,10 @@ class Packet {
         if (packetByteLength > 0) {
             sum += (packetBytes[count] << 8 & 0xFF00);
             if ((sum & 0xFFFF0000) > 0) { //TODO (2)
-                sum = (short) ((sum & 0xFFFF) + 1);
+                sum = ((sum & 0xFFFF) + 1);
             }
         }
+        //inverts the sum by getting the unary bitwise complement
         return (short) (~sum & 0xFFFF);
     }
 
