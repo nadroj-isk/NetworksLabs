@@ -7,6 +7,7 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Random;
 
+
 //use tux050 tux065
 
 public class UDPClient {
@@ -16,7 +17,7 @@ public class UDPClient {
         int port = ports[0];
 
         DatagramSocket clientSocket = new DatagramSocket();        //creates socket for user
-        InetAddress IPAddress = InetAddress.getByName("172.17.107.147");    //gets IP address of Server
+        InetAddress IPAddress = InetAddress.getByName("172.19.144.73");    //gets IP address of Server
 
         byte[] sendData;    //creates packet to be sent
         byte[] receiveData = new byte[256]; //creates packet to be received
@@ -53,6 +54,10 @@ public class UDPClient {
             //if it is then that means the data is done sending and it will break out of the loop
             if (createReceivedPacket.GETPacketData()[0] == '\0') {
                 DataDoneSending = true;
+                if(receivedPackets.size() == 0){
+                    System.out.println("Error File Not Found");
+                    return;
+                }
             } else {
                 receivedPackets.add(createReceivedPacket); //received packets are added to the packet array
             }
@@ -101,7 +106,7 @@ public class UDPClient {
 
     }
 
-    //Gremlin function TODO
+    //Gremlin function
     private static void Gremlin(String probOfDamage, Packet receivedPacket) {
         Random random = new Random();
         //pick a random number

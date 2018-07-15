@@ -22,14 +22,13 @@ public class UDPServer {
 
         byte[] receiveData = new byte[256]; //create bytes for sending/receiving data
 
-        String fileDataContents = "";   //variable for the file data contents
         Scanner readFileIn;  //Create an instance of the Scanner class so files can be read in
 
         while (true) {
 
+            StringBuilder fileDataContents = new StringBuilder();   //variable for the file data contents
             DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length); //Creates a new datagram
             serverSocket.receive(receivePacket);
-
             System.out.println("Receiving the request packet.");
 
             //Gets the IPAddress and Port number of Host
@@ -45,13 +44,19 @@ public class UDPServer {
             readFileIn = new Scanner(dataFromClient);
 
             readFileIn.next(); //skips the GET command of the HTTP request message to just read in the TestFile
-            String fileName = readFileIn.next(); //checks for Null space in filename and if there is then file closes TODO
+            String fileName = readFileIn.next(); //grabs file name
             readFileIn.close(); //closes the file
 
-
-            readFileIn = new Scanner(new File(fileName));  //File requested by host
+            try {
+                readFileIn = new Scanner(new File(fileName));  //File requested by host
+            }
+            catch (Exception e) {   //if file not found, crashes gracefully
+                System.out.println(e.getClass());
+                serverSocket.send(setNullPacket(IPAddress, portReceive));
+                continue;
+            }
             while (readFileIn.hasNext()) {  //get the contents of the file line by line
-                fileDataContents += readFileIn.nextLine();
+                fileDataContents.append(readFileIn.nextLine());
             }
             System.out.println("File: " + fileDataContents); //print the file contents received
             readFileIn.close(); //close the file
@@ -61,9 +66,9 @@ public class UDPServer {
             String HTTP_HeaderForm = "HTTP/1.0 200 Document Follows\r\n"
                     + "Content-Type: text/plain\r\n"
                     + "Content-Length: " + fileDataContents.length() + "\r\n"
-                    + "\r\n";
+                    + "\r\n" + fileDataContents;
 
-            HTTP_HeaderForm += fileDataContents;
+
             //////////////////////////////////////////////////////////////////////////////////////
             ArrayList<Packet> PacketList = Packet.Segmentation(HTTP_HeaderForm.getBytes()); //segments file into packets
             int packetNumber = 0;
@@ -75,12 +80,16 @@ public class UDPServer {
             }
             //Sends Null Packet to let host know transfer is over
             //TODO check and see if this is correct implementation
-            String nullByte = "\0";
-            ArrayList<Packet> nullPacket = Packet.Segmentation(nullByte.getBytes());    //null packet changed to full 256 bit size, but only contains 1 bit of info
-            DatagramPacket nullDatagram = nullPacket.get(0).getDatagramPacket(IPAddress, portReceive);
-            serverSocket.send(nullDatagram);
-            System.out.println("Sending Final Packet");
+            serverSocket.send(setNullPacket(IPAddress, portReceive));
         }
+    }
+
+    private static DatagramPacket setNullPacket(InetAddress IPAddress, int portReceive){
+        String nullByte = "\0";
+        ArrayList<Packet> nullPacket = Packet.Segmentation(nullByte.getBytes());    //null packet changed to full 256 bit size, but only contains 1 bit of info
+        DatagramPacket nullDatagram = nullPacket.get(0).getDatagramPacket(IPAddress, portReceive);
+        System.out.println("Sending Null Packet");
+        return nullDatagram;
     }
 
 }
