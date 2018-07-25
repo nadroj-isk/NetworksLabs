@@ -12,13 +12,13 @@ import java.util.Scanner;
  * @author Stephanie Parrish, Jordan Sosnowski, Marcus Woodard
  * @version 7.15.18
  */
-public class UDPServer {
+public class SR_UDPServer {
 
     public static void main(String args[]) throws Exception {
 
         int[] ports = {10028, 10029, 10030, 10031}; //list of port numbers assigned to our group to use
         int port = ports[0];
-
+        final int  WINDOWSIZE = 8;
         System.out.print("Getting IP Address..."); //remove later
         String localhost = InetAddress.getLocalHost().getHostAddress().trim();  //grabs IP to use for Client
         System.out.println("\nConnected to: " + localhost); //prints out the Server IP
@@ -26,7 +26,7 @@ public class UDPServer {
         DatagramSocket serverSocket = new DatagramSocket(port);
 
 
-        byte[] receiveData = new byte[256]; //create bytes for sending/receiving data
+        byte[] receiveData = new byte[512]; //create bytes for sending/receiving data
 
         Scanner readFileIn;  //Create an instance of the Scanner class so files can be read in
 
@@ -76,16 +76,40 @@ public class UDPServer {
 
 
             //////////////////////////////////////////////////////////////////////////////////////
-            ArrayList<Packet> PacketList = Packet.Segmentation(HTTP_HeaderForm.getBytes()); //segments file into packets
+            ArrayList<SR_Packet> PacketList = SR_Packet.Segmentation(HTTP_HeaderForm.getBytes()); //segments file into packets
+            ArrayList<String> Packets_Sent_Numbers = new ArrayList<>();
+            ArrayList<String> Packets_ACKd_Numbers = new ArrayList<>();
+
             int packetNumber = 0;
-            for (Packet packet : PacketList) {  //iterates through packets and sends them to host
+            for (SR_Packet packet : PacketList) {  //iterates through packets and sends them to host
+                while (Packets_Sent_Numbers.size() == 8) { //once size hit...waits for ACKs
+                    receiveData = new byte[512]; //create bytes for sending/receiving data
+                    DatagramPacket ACK_received = new DatagramPacket(receiveData, receiveData.length); //Creates a new datagram
+                    serverSocket.receive(ACK_received);
+                    String ackFromClient = new String(ACK_received.getData()).trim();
+                    if (ackFromClient.contains("ACK")) { //Message should be ACK:##
+                        String[] ackSplit = ackFromClient.split(":");
+                        String ackNum = ackSplit[1];
+                        System.out.println(ackFromClient);
+                        if (Packets_Sent_Numbers.contains(ackNum)) {
+                            Packets_ACKd_Numbers.add(ackNum);
+                            while (Packets_ACKd_Numbers.size() > 0) {
+                                if (Packets_ACKd_Numbers.contains(Packets_Sent_Numbers.get(0))) { //if start of window
+                                    Packets_ACKd_Numbers.remove(Packets_Sent_Numbers.get(0));
+                                    Packets_Sent_Numbers.remove(0); //allows window to be shifted
+                                }
+                            }
+                        }
+
+                    }
+                }
                 DatagramPacket sendPacket = packet.getDatagramPacket(IPAddress, portReceive);
                 serverSocket.send(sendPacket);
+                Packets_Sent_Numbers.add(packet.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
                 packetNumber++;
                 System.out.println("Sending Packet " + packetNumber + " of " + PacketList.size());
-            }
+                }
             //Sends Null Packet to let host know transfer is over
-            //TODO check and see if this is correct implementation
             serverSocket.send(setNullPacket(IPAddress, portReceive));
         }
     }
@@ -99,7 +123,7 @@ public class UDPServer {
      */
     private static DatagramPacket setNullPacket(InetAddress IPAddress, int portReceive){
         String nullByte = "\0";
-        ArrayList<Packet> nullPacket = Packet.Segmentation(nullByte.getBytes());    //null packet changed to full 256 bit size, but only contains 1 bit of info
+        ArrayList<SR_Packet> nullPacket = SR_Packet.Segmentation(nullByte.getBytes());    //null packet changed to full 256 bit size, but only contains 1 bit of info
         DatagramPacket nullDatagram = nullPacket.get(0).getDatagramPacket(IPAddress, portReceive);
         System.out.println("Sending Null Packet");
         return nullDatagram;

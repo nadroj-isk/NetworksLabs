@@ -8,12 +8,12 @@ import java.util.Map;
  * This class contains the methods used for packets including creating a packet, getting packet data,
  * getting/setting the packet header, getting/setting the packet segment number, segmentation, re-assembly,
  * and the check sum function
- * 
+ *
  * @author StephanieParrish, Jordan Sosnowski, and Marcus Woodard
  * @version 7/15/2018
  */
 
-class Packet {
+class SR_Packet {
 
     ///////Package Header///////
     //Constant Variables
@@ -29,7 +29,7 @@ class Packet {
     private Map<String, String> PacketHeader;
 
     //Constructor
-    private Packet() {
+    private SR_Packet() {
         //Initialize data array
         PackageData = new byte[PACKET_SIZE];
 
@@ -38,16 +38,16 @@ class Packet {
     }
 
     //Reassemble Packet function called by the UDPClient. Takes in the list of segmented packets and re-assembles them.
-    static byte[] ReassemblePacket(ArrayList<Packet> PacketList) {
+    static byte[] ReassemblePacket(ArrayList<SR_Packet> PacketList) {
         int totalSize = 0;
         //gets packet data size for each of the segmented packets
-        for (Packet aPacketList : PacketList) totalSize += aPacketList.getPacketDataSize();
+        for (SR_Packet aPacketList : PacketList) totalSize += aPacketList.getPacketDataSize();
         //creates a byte that will contain the total size for the final returned packet
         byte[] returnPacket = new byte[totalSize];
         int returnCounter = 0;
         for (int i = 0; i < PacketList.size(); i++) {
             //Search the packetList for each packet
-            for (Packet FindPacket : PacketList) {
+            for (SR_Packet FindPacket : PacketList) {
             	//gets packet by segment number
                 String segmentNumber = FindPacket.getHeaderValue(HEADER_ELEMENTS.SEGMENT_NUMBER);
                 //gets the packet data size and data that match the segment number found
@@ -64,9 +64,9 @@ class Packet {
     }
 
     //Segmentation is called by the UDPServer to break the packets into segments
-    static ArrayList<Packet> Segmentation(byte[] fileBytes) {
+    static ArrayList<SR_Packet> Segmentation(byte[] fileBytes) {
     	//creates an empty array list for the newly segmented packets
-        ArrayList<Packet> returnPacket = new ArrayList<>();
+        ArrayList<SR_Packet> returnPacket = new ArrayList<>();
         //gets the fileBytes length
         int fileLength = fileBytes.length;
         //if the file has a length zero then throws an error saying the file is empty
@@ -75,14 +75,14 @@ class Packet {
         }
         int byteCounter = 0;
         int segmentNumber = 0;
-        //checks the fileLength against the byte counter. 
-        //As long as the byteCounter is less than the file length a new packet will be created of size 252
+        //checks the fileLength against the byte counter.
+        //As long as the byteCounter is less than the file length a new SR_Packet will be created of size 252
         while (byteCounter < fileLength) {
-            Packet nextPacket = new Packet();
+            SR_Packet nextPacket = new SR_Packet();
             byte[] nextPacketData = new byte[PACKET_DATA_SIZE];
             //read in amount of data size 256 (total) - 4 (header) = 252 (data)
             int readInDataSize = PACKET_DATA_SIZE; //only allows 252 bytes since the other 4 are for the header
-            //as long as the file length - the number of bytes counted is less than 252 
+            //as long as the file length - the number of bytes counted is less than 252
             //then more data is added to the packet segment
             if (fileLength - byteCounter < PACKET_DATA_SIZE) {
                 readInDataSize = fileLength - byteCounter;
@@ -101,7 +101,7 @@ class Packet {
             nextPacket.setHeaderValue(HEADER_ELEMENTS.SEGMENT_NUMBER, segmentNumber + "");
 
             //CheckSum (errors)
-            String CheckSumPacket = String.valueOf(Packet.CheckSum(nextPacketData));
+            String CheckSumPacket = String.valueOf(SR_Packet.CheckSum(nextPacketData));
             nextPacket.setHeaderValue(HEADER_ELEMENTS.CHECKSUM, CheckSumPacket);
             returnPacket.add(nextPacket);
 
@@ -116,15 +116,15 @@ class Packet {
     }
 
     //Creates a new packet
-    static Packet CreatePacket(DatagramPacket packet) {
-        Packet newPacket = new Packet();
+    static SR_Packet CreatePacket(DatagramPacket packet) {
+        SR_Packet newPacket = new SR_Packet();
         ByteBuffer bytebuffer = ByteBuffer.wrap(packet.getData()); //wraps the byte array into the buffer
         newPacket.setHeaderValue(HEADER_ELEMENTS.SEGMENT_NUMBER, bytebuffer.getShort() + ""); //sets header segment number
         newPacket.setHeaderValue(HEADER_ELEMENTS.CHECKSUM, bytebuffer.getShort() + ""); //sets header checksum
         byte[] PacketData = packet.getData(); //gets the packet data
         byte[] remaining = new byte[PacketData.length - bytebuffer.position()]; //subtracts the package data length from the byte buffer position
         //copies  an array from the specified source array, beginning at the specified position, to the specified position of the destination array
-        System.arraycopy(PacketData, bytebuffer.position(), remaining, 0, remaining.length); 
+        System.arraycopy(PacketData, bytebuffer.position(), remaining, 0, remaining.length);
         newPacket.setPacketData(remaining); //sets the packet data
         return newPacket; //returns the newly created packet
     }
@@ -137,7 +137,7 @@ class Packet {
         //gets length of the packetBytes Array
         int packetByteLength = packetBytes.length;
         int count = 0;
-        while (packetByteLength > 1) { //while the length is greater than 1 then the bits will be shifted left 
+        while (packetByteLength > 1) { //while the length is greater than 1 then the bits will be shifted left
         	//get the packetByte in the array of the count shift it left 8 bits
             sum += ((packetBytes[count]) << 8 & 0xFF00) | ((packetBytes[count + 1]) & 0x00FF);
             //if a carry occurred then it is wrapped around
@@ -152,7 +152,7 @@ class Packet {
 
         if (packetByteLength > 0) {
             sum += (packetBytes[count] << 8 & 0xFF00);
-            if ((sum & 0xFFFF0000) > 0) { 
+            if ((sum & 0xFFFF0000) > 0) {
                 sum = ((sum & 0xFFFF) + 1);
             }
         }
@@ -169,7 +169,7 @@ class Packet {
             case CHECKSUM:
                 return PacketHeader.get(HEADER_CHECKSUM);
             default:
-                throw new IllegalArgumentException("HSomething is broken... bad broken");
+                throw new IllegalArgumentException("Something is broken... bad broken");
         }
     }
 

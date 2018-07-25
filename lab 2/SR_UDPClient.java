@@ -17,10 +17,10 @@ import java.util.Random;
  * @author Stephanie Parrish, Jordan Sosnowski, Marcus Woodard
  * @version 7.15.18
 */
-public class UDPClient {
+public class SR_UDPClient {
 
     public static void main(String args[]) throws Exception {
-        final String IPADDRESSOFSERVER = "172.19.146.56";
+        final String IPADDRESSOFSERVER = "172.19.146.43";
         int[] ports = {10028, 10029, 10030, 10031}; //Group Assigned Port Numbers
         int port = ports[0];
 
@@ -28,7 +28,7 @@ public class UDPClient {
         InetAddress IPAddress = InetAddress.getByName(IPADDRESSOFSERVER);    //gets IP address of Server
 
         byte[] sendData;    //creates packet to be sent
-        byte[] receiveData = new byte[256]; //creates packet to be received
+        byte[] receiveData = new byte[512]; //creates packet to be received
         String GremlinProbability = "0.0";
         boolean DataDoneSending = false;
         int packetNumber = 0;
@@ -47,17 +47,17 @@ public class UDPClient {
         System.out.println("Receiving packets...");
 
         DatagramPacket receivePacket; //Declares the Datagram packet for receive packet
-        ArrayList<Packet> receivedPackets = new ArrayList<>(); //create a new array of packets received
+        ArrayList<SR_Packet> receivedPackets = new ArrayList<>(); //create a new array of packets received
         while (!DataDoneSending ) { //check to see if the data is done sending to host
 
             receivePacket = new DatagramPacket(receiveData, receiveData.length); //creates a null datagram packet
             clientSocket.receive(receivePacket); //receives the actual packet from the server
 
             //create a packet from the data received
-            Packet createReceivedPacket = Packet.CreatePacket(receivePacket);
+            SR_Packet createReceivedPacket = SR_Packet.CreatePacket(receivePacket);
             packetNumber++;
 
-            System.out.println("Packet: " + packetNumber);
+            System.out.println("Receiving Packet #: " + packetNumber);
             //checks to see if the packet data is null
             //if it is then that means the data is done sending and it will break out of the loop
             if (createReceivedPacket.GETPacketData()[0] == '\0') {
@@ -66,32 +66,40 @@ public class UDPClient {
                     System.out.println("Error File Not Found");
                     return;
                 }
-            } else {
-                receivedPackets.add(createReceivedPacket); //received packets are added to the packet array
+            } else { //run gremlin, if no error ACK packet and add to list, otherwise keep looping
+                //use command line arguments to detect Gremlin probability
+                //checks for no arguments and if there are none then notify user and
+                //set the DataDoneSending to true
+                System.out.println("Running Gremlin...");
+                if (args.length == 0) {
+                    System.out.println("There are no arguments detected for Gremlin Probability");
+                } else {
+                    //if there is arguments then set the Gremlin Probability to these
+                    GremlinProbability = args[0];
+                }
+                //send each of the packets with arguments through the Gremlin function to
+                //determine whether to change some of the packet bit or pass the packet as it is to the receiving function
+                Gremlin(GremlinProbability, createReceivedPacket);
+
+
+                //Check for error detection in the received packets
+                if(!ErrorDetection(createReceivedPacket)){
+                  receivedPackets.add(createReceivedPacket); //received packets are added to the packet array
+                  String ACK = "Sending ACK:" + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER); //request to be sent to Server
+                  System.out.println(ACK);
+                  byte [] ackData = ACK.getBytes(); //gets request in byte form
+
+                  //sends ACK to server
+                  DatagramPacket sendACK = new DatagramPacket(ackData, ackData.length, IPAddress, port);
+                  clientSocket.send(sendACK);
+                }
             }
         }
 
-        //use command line arguments to detect Gremlin probability
-        //checks for no arguments and if there are none then notify user and
-        //set the DataDoneSending to true
-        System.out.println("Running Gremlin...");
-        if (args.length == 0) {
-            System.out.println("There are no arguments detected for Gremlin Probability");
-        } else {
-            //if there is arguments then set the Gremlin Probability to these
-            GremlinProbability = args[0];
-        }
-        //send each of the packets with arguments through the Gremlin function to
-        //determine whether to change some of the packet bit or pass the packet as it is to the receiving function
-        for (Packet packets : receivedPackets) {
-            Gremlin(GremlinProbability, packets);
-        }
 
-        //Check for error detection in the received packets
-        ErrorDetection(receivedPackets);
 
         //Reassembles Packets that were received
-        byte[] ReassemblePacketFile = Packet.ReassemblePacket(receivedPackets);
+        byte[] ReassemblePacketFile = SR_Packet.ReassemblePacket(receivedPackets);
         String modifiedPacketData = new String(ReassemblePacketFile);
         System.out.println("Packet Data Received from UDPServer:\n" + modifiedPacketData);
         clientSocket.close();
@@ -123,7 +131,7 @@ public class UDPClient {
      * @param probOfDamage: probability that a bit will be damaged
      * @param receivedPacket: packet to be damaged by gremlin
      **/
-    private static void Gremlin(String probOfDamage, Packet receivedPacket) {
+    private static void Gremlin(String probOfDamage, SR_Packet receivedPacket) {
         Random random = new Random();
 
         int dmgRand = random.nextInt(100) + 1; //pick a random number between 1 - 100
@@ -150,16 +158,37 @@ public class UDPClient {
      *
      * @param PacketList: list of packets received by Client
      */
-    private static void ErrorDetection(ArrayList<Packet> PacketList) {
-        for (Packet aPacketList : PacketList) {
-            String strReceivedCheckSum = aPacketList.getHeaderValue(Packet.HEADER_ELEMENTS.CHECKSUM);
+    private static void ErrorDetection(ArrayList<SR_Packet> PacketList) {
+        for (SR_Packet aPacketList : PacketList) {
+            String strReceivedCheckSum = aPacketList.getHeaderValue(SR_Packet.HEADER_ELEMENTS.CHECKSUM);
             Short receivedCheckSum = Short.parseShort(strReceivedCheckSum);
 
             byte[] data = aPacketList.GETPacketData();
-            short calcCheckSum = Packet.CheckSum(data);
+            short calcCheckSum = SR_Packet.CheckSum(data);
             if (!receivedCheckSum.equals(calcCheckSum)) //Checks to see if packets prior checksum is equal to current checksum
-                System.out.println("Error detected in Packet Number: " + aPacketList.getHeaderValue(Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
+                System.out.println("Error detected in Packet Number: " + aPacketList.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
         }
     }
+
+    /**ErrorDetection function
+     * Detects if packet was damaged by Gremlin function, prints packet number of corrupted packet
+     *
+     * @param aPacketList: list of packets received by Client
+     * @return True if error detected, false if error not detected
+     */
+    private static boolean ErrorDetection(SR_Packet aPacketList) {
+            String strReceivedCheckSum = aPacketList.getHeaderValue(SR_Packet.HEADER_ELEMENTS.CHECKSUM);
+            Short receivedCheckSum = Short.parseShort(strReceivedCheckSum);
+
+            byte[] data = aPacketList.GETPacketData();
+            short calcCheckSum = SR_Packet.CheckSum(data);
+            if (!receivedCheckSum.equals(calcCheckSum)){ //Checks to see if packets prior checksum is equal to current checksum
+                System.out.println("Error detected in Packet Number: " + aPacketList.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
+                return true;
+              }
+            else
+              return false;
+
+      }
 
 }
