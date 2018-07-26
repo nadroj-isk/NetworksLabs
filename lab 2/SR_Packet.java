@@ -106,7 +106,7 @@ class SR_Packet {
             returnPacket.add(nextPacket);
 
             //increase the segment number
-            segmentNumber++;
+            segmentNumber = (segmentNumber + 1) % 24 ;
 
             //increase the counter by the amount read in
             byteCounter = byteCounter + readInDataSize;

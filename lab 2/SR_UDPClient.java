@@ -19,8 +19,10 @@ import java.util.Random;
 */
 public class SR_UDPClient {
 
+    static final String IPADDRESSOFSERVER = "172.19.146.43";
+
     public static void main(String args[]) throws Exception {
-        final String IPADDRESSOFSERVER = "172.19.146.43";
+
         int[] ports = {10028, 10029, 10030, 10031}; //Group Assigned Port Numbers
         int port = ports[0];
 
@@ -29,9 +31,20 @@ public class SR_UDPClient {
 
         byte[] sendData;    //creates packet to be sent
         byte[] receiveData = new byte[512]; //creates packet to be received
-        String GremlinProbability = "0.0";
+        String[] GremlinProbability = new String [2];
         boolean DataDoneSending = false;
         int packetNumber = 0;
+
+        // ********** SETUP GREMLIN **********
+            //use command line arguments to detect Gremlin probability
+            //checks for no arguments and if there are none then notify user and
+        if (args.length != 2) {
+            System.out.println("There are no arguments detected for Gremlin Probability");
+        } else {
+            //if there is arguments then set the Gremlin Probability to these
+            GremlinProbability[0] = args[0];
+            GremlinProbability[1] = args[1];
+        }
 
         // ********** SENDING DATA **********
         String TestFile = "GET TestFile.html HTTP/1.0"; //request to be sent to Server
@@ -66,37 +79,34 @@ public class SR_UDPClient {
                     System.out.println("Error File Not Found");
                     return;
                 }
-            } else { //run gremlin, if no error ACK packet and add to list, otherwise keep looping
-                //use command line arguments to detect Gremlin probability
-                //checks for no arguments and if there are none then notify user and
-                //set the DataDoneSending to true
-                System.out.println("Running Gremlin...");
-                if (args.length == 0) {
-                    System.out.println("There are no arguments detected for Gremlin Probability");
-                } else {
-                    //if there is arguments then set the Gremlin Probability to these
-                    GremlinProbability = args[0];
-                }
+            }
+            else {
                 //send each of the packets with arguments through the Gremlin function to
                 //determine whether to change some of the packet bit or pass the packet as it is to the receiving function
-                Gremlin(GremlinProbability, createReceivedPacket);
+                if(!Gremlin(GremlinProbability, createReceivedPacket)){ //if false packet lost -> do not run error detection
+                  //Check for error detection in the received packets
+                  if (ErrorDetection(createReceivedPacket)) { //if error detected send NAK
+                    //gets the segment number of unacknowledged packet
+                    String NAK = "Sending NAK:" + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER); //NAK sent back to the server
+                    System.out.println(NAK);
+                    byte [] nakData = NAK.getBytes(); //gets request in byte form
 
+                    //sends NAK to the serverSocket
+                    DatagramPacket sendNAK = new DatagramPacket(nakData, nakData.length, IPAddress, port);
+                    clientSocket.send(sendNAK);
+                  }
+                  else //if error not detected send ACK
+                    receivedPackets.add(createReceivedPacket); //received packets are added to the packet array
+                    String ACK = "Sending ACK:" + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER); //request to be sent to Server
+                    System.out.println(ACK);
+                    byte [] ackData = ACK.getBytes(); //gets request in byte form
 
-                //Check for error detection in the received packets
-                if(!ErrorDetection(createReceivedPacket)){
-                  receivedPackets.add(createReceivedPacket); //received packets are added to the packet array
-                  String ACK = "Sending ACK:" + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER); //request to be sent to Server
-                  System.out.println(ACK);
-                  byte [] ackData = ACK.getBytes(); //gets request in byte form
-
-                  //sends ACK to server
-                  DatagramPacket sendACK = new DatagramPacket(ackData, ackData.length, IPAddress, port);
-                  clientSocket.send(sendACK);
+                    //sends ACK to server
+                    DatagramPacket sendACK = new DatagramPacket(ackData, ackData.length, IPAddress, port);
+                    clientSocket.send(sendACK);
+                  }
                 }
             }
-        }
-
-
 
         //Reassembles Packets that were received
         byte[] ReassemblePacketFile = SR_Packet.ReassemblePacket(receivedPackets);
@@ -128,46 +138,48 @@ public class SR_UDPClient {
      * P(2 bytes damaged) = 30%
      * P(3 bytes damaged) = 20%
      *
-     * @param probOfDamage: probability that a bit will be damaged
+     * @param args: probability that a bit will be damaged or lost
      * @param receivedPacket: packet to be damaged by gremlin
+     * @return False: Packet not lost
+     * @return True:  Packet lost
      **/
-    private static void Gremlin(String probOfDamage, SR_Packet receivedPacket) {
+    private static boolean Gremlin(String[] args, SR_Packet receivedPacket) {
         Random random = new Random();
 
         int dmgRand = random.nextInt(100) + 1; //pick a random number between 1 - 100
         int howManyRand = random.nextInt(100) + 1; //pick a random number between 1 - 100
         int bytesToChange;
-        if (howManyRand <= 50) {    //Change only 1 Byte
-            bytesToChange = 1;
-        } else if (howManyRand <= 80) { //Change 2 Bytes
-            bytesToChange = 2;
-        } else bytesToChange = 3; //Change 3 Bytes
-        double damagedProbability = Double.parseDouble(probOfDamage) * 100;
-        if (dmgRand <= damagedProbability) { //if probability to change bytes is hit
-            for (int i = 0; i <= bytesToChange; i++) {
-                byte[] data = receivedPacket.GETPacketData();
-                int byteToCorrupt = random.nextInt(receivedPacket.getPacketDataSize()); // pick a random byte
-                data[byteToCorrupt] = (byte) ~data[byteToCorrupt]; // flip the bits in that byte
-            }
-
+        String lostPackets = "0.0";
+        String damagedPackets = "0.0";
+        //checks to see if the command line arguments have been put in for damage and lost packets probability
+        if (args.length < 2) {
+          System.out.println("Please input the command line arguments for the gremlin probability.");
         }
-    }
-
-    /**ErrorDetection function
-     * Detects if packet was damaged by Gremlin function, prints packet number of corrupted packet
-     *
-     * @param PacketList: list of packets received by Client
-     */
-    private static void ErrorDetection(ArrayList<SR_Packet> PacketList) {
-        for (SR_Packet aPacketList : PacketList) {
-            String strReceivedCheckSum = aPacketList.getHeaderValue(SR_Packet.HEADER_ELEMENTS.CHECKSUM);
-            Short receivedCheckSum = Short.parseShort(strReceivedCheckSum);
-
-            byte[] data = aPacketList.GETPacketData();
-            short calcCheckSum = SR_Packet.CheckSum(data);
-            if (!receivedCheckSum.equals(calcCheckSum)) //Checks to see if packets prior checksum is equal to current checksum
-                System.out.println("Error detected in Packet Number: " + aPacketList.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
+        else {
+          lostPackets = args[0];
+          damagedPackets = args[1];
         }
+        double lostProbability = Double.parseDouble(lostPackets) * 100;
+        double damagedProbability = Double.parseDouble(damagedPackets) * 100;
+        //if the packet is lost then it returns true
+        if(dmgRand <= lostProbability) {
+          return true;
+        }
+        if (dmgRand <= damagedProbability) {
+          if (howManyRand <= 50) {    //Change only 1 Byte
+              bytesToChange = 1;
+          } else if (howManyRand <= 80) { //Change 2 Bytes
+              bytesToChange = 2;
+          } else bytesToChange = 3; //Change 3 Bytes
+          if (dmgRand <= damagedProbability) { //if probability to change bytes is hit
+              for (int i = 0; i <= bytesToChange; i++) {
+                  byte[] data = receivedPacket.GETPacketData();
+                  int byteToCorrupt = random.nextInt(receivedPacket.getPacketDataSize()); // pick a random byte
+                  data[byteToCorrupt] = (byte) ~data[byteToCorrupt]; // flip the bits in that byte
+              }
+          }
+        }
+return false;
     }
 
     /**ErrorDetection function

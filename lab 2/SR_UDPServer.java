@@ -4,6 +4,8 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Scanner;
+import java.net.SocketTimeoutException;
+import java.lang.Math;
 
 /** UDPServer Class
  * Runs on Server machine to send HTML files to Client
@@ -13,6 +15,9 @@ import java.util.Scanner;
  * @version 7.15.18
  */
 public class SR_UDPServer {
+
+    static final double ALPHA = .125;
+    static final double BETA = .25;
 
     public static void main(String args[]) throws Exception {
 
@@ -77,38 +82,78 @@ public class SR_UDPServer {
 
             //////////////////////////////////////////////////////////////////////////////////////
             ArrayList<SR_Packet> PacketList = SR_Packet.Segmentation(HTTP_HeaderForm.getBytes()); //segments file into packets
-            ArrayList<String> Packets_Sent_Numbers = new ArrayList<>();
-            ArrayList<String> Packets_ACKd_Numbers = new ArrayList<>();
+            ArrayList<String> ackedPackets = new ArrayList<>();
+            ArrayList<String> sentUnAckedPackets = new ArrayList<>();
+
+            ArrayList<Double> sendTimes = new ArrayList<>();
+            ArrayList<Double> ackReceiveTime = new ArrayList<>();
+            ArrayList<Double> estRTT = new ArrayList<>();
+            estRTT.add(40.0);
+            ArrayList<Double> devRTT = new ArrayList<>();
+            devRTT.add(0.0);
+            ArrayList<Double> timeoutRTT = new ArrayList<>();
+            timeoutRTT.add(calculateTimeoutRtt(0, estRTT.get(0), devRTT.get(0)));
 
             int packetNumber = 0;
-            for (SR_Packet packet : PacketList) {  //iterates through packets and sends them to host
-                while (Packets_Sent_Numbers.size() == 8) { //once size hit...waits for ACKs
-                    receiveData = new byte[512]; //create bytes for sending/receiving data
-                    DatagramPacket ACK_received = new DatagramPacket(receiveData, receiveData.length); //Creates a new datagram
-                    serverSocket.receive(ACK_received);
-                    String ackFromClient = new String(ACK_received.getData()).trim();
-                    if (ackFromClient.contains("ACK")) { //Message should be ACK:##
-                        String[] ackSplit = ackFromClient.split(":");
-                        String ackNum = ackSplit[1];
-                        System.out.println(ackFromClient);
-                        if (Packets_Sent_Numbers.contains(ackNum)) {
-                            Packets_ACKd_Numbers.add(ackNum);
-                            while (Packets_ACKd_Numbers.size() > 0) {
-                                if (Packets_ACKd_Numbers.contains(Packets_Sent_Numbers.get(0))) { //if start of window
-                                    Packets_ACKd_Numbers.remove(Packets_Sent_Numbers.get(0));
-                                    Packets_Sent_Numbers.remove(0); //allows window to be shifted
-                                }
-                            }
-                        }
+            int windowBaseIndex = 0;
+            while(packetNumber < PacketList.size()) {
+                if (windowBaseIndex <= 8) { //once size hit...waits for ACKs{
+                    DatagramPacket sendPacket = PacketList.get(packetNumber).getDatagramPacket(IPAddress, portReceive);
+                    serverSocket.send(sendPacket);
+                    sentUnAckedPackets.add(PacketList.get(packetNumber).getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER)); //adds packet to window
+                    System.out.println("Sending Packet " + packetNumber + " of " + PacketList.size());
+                    sendTimes.add(getTimeInDouble());
+                    packetNumber++;
+                    windowBaseIndex++;
+                }
+                /*for (double time = timeInDouble() - sendTimes.get(packetNumber); time <= timeoutRTT.get(packetNumber); time){
 
-                    }
-                }
-                DatagramPacket sendPacket = packet.getDatagramPacket(IPAddress, portReceive);
-                serverSocket.send(sendPacket);
-                Packets_Sent_Numbers.add(packet.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
-                packetNumber++;
-                System.out.println("Sending Packet " + packetNumber + " of " + PacketList.size());
-                }
+                }*/
+                  receiveData = new byte[512]; //create bytes for sending/receiving data
+                  DatagramPacket clientResponse = new DatagramPacket(receiveData, receiveData.length); //Creates a new datagram
+                  serverSocket.setSoTimeout(40); //TODO MARCUS
+                  try{
+                    serverSocket.receive(clientResponse);
+                  }
+                  catch(SocketTimeoutException e) {
+                    DatagramPacket sendPacket = PacketList.get(packetNumber-1).getDatagramPacket(IPAddress, portReceive);
+                    serverSocket.send(sendPacket);
+                    System.out.println("Re-Sending Lost Packet " + (packetNumber - 1) + " of " + PacketList.size());
+                    sendTimes.add(getTimeInDouble());
+                    continue;
+                  }
+                  String responseFromClient = new String(clientResponse.getData()).trim();
+                  if (responseFromClient.contains("ACK")) { //Message should be ACK:##
+                      String[] ackSplit = responseFromClient.split(":");
+                      String ackNum = ackSplit[1];
+                      System.out.println(responseFromClient);
+                      if (sentUnAckedPackets.contains(ackNum)) { //Packet now ACkd
+                          if (sentUnAckedPackets.get(0).equals(ackNum)) {
+                              windowBaseIndex--;
+                              int checkNum = Integer.parseInt(ackNum);
+                              for (String packet : ackedPackets) {
+                                  if ((Integer.parseInt(packet) - 1) == checkNum) {
+                                      checkNum++;
+                                      ackedPackets.remove(packet);
+                                      } else break;
+                                    }
+                                  }
+                                  sentUnAckedPackets.remove(ackNum);
+                                  ackedPackets.add(ackNum);
+                                }
+                              } else if (responseFromClient.contains("NAK")) { //message should get resent
+                                String[] nakSplit = responseFromClient.split(":");
+                                String nakNum = nakSplit[1];
+                                System.out.println(responseFromClient);
+                                if (sentUnAckedPackets.contains(nakNum) && windowBaseIndex <= 8) {
+                                  DatagramPacket resendPacket = PacketList.get(Integer.parseInt(nakNum)).getDatagramPacket(IPAddress, portReceive);
+                                  serverSocket.send(resendPacket);
+                                  System.out.println("Re-Sending Packet " + nakNum + " of " + PacketList.size());
+                                  windowBaseIndex++;
+                                }
+                              }
+                          }
+
             //Sends Null Packet to let host know transfer is over
             serverSocket.send(setNullPacket(IPAddress, portReceive));
         }
@@ -129,4 +174,21 @@ public class SR_UDPServer {
         return nullDatagram;
     }
 
+    private static double calculateEstRtt(double sampRttIn, double estRttIn){
+       double estRttOut = (1-ALPHA) * estRttIn + ALPHA * sampRttIn;
+       return estRttOut;
+    }
+    private static double calculateDevRtt(double sampRttIn, double devRttIn){
+      double devRttOut = (1-BETA) * devRttIn + BETA * Math.abs(sampRttIn + devRttIn);
+      return devRttOut;
+    }
+    private static double calculateTimeoutRtt(double sampRttIn, double estRttIn, double devRttIn){
+      double timeoutRttOut = calculateEstRtt(sampRttIn, estRttIn) + 4 *  calculateDevRtt(sampRttIn, devRttIn);
+      return timeoutRttOut;
+    }
+
+    private static double getTimeInDouble(){
+        double timeInDouble = Double.parseDouble(Long.toString(System.currentTimeMillis()));
+        return timeInDouble;
+    }
 }
