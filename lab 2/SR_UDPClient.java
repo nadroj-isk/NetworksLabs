@@ -62,16 +62,16 @@ public class SR_UDPClient {
 
         DatagramPacket receivePacket; //Declares the Datagram packet for receive packet
         ArrayList<SR_Packet> receivedPackets = new ArrayList<>(); //create a new array of packets received
+        int i = 0;
         while (!DataDoneSending) { //check to see if the data is done sending to host
 
             receivePacket = new DatagramPacket(receiveData, receiveData.length); //creates a null datagram packet
             clientSocket.receive(receivePacket); //receives the actual packet from the server
-
             //create a packet from the data received
             SR_Packet createReceivedPacket = SR_Packet.CreatePacket(receivePacket);
             packetNumber++;
 
-            System.out.println("Receiving Packet #: " + packetNumber);
+            System.out.println("Receiving Packet #: " + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
             //checks to see if the packet data is null
             //if it is then that means the data is done sending and it will break out of the loop
             if (createReceivedPacket.GETPacketData()[0] == '\0') {
@@ -80,7 +80,8 @@ public class SR_UDPClient {
                     System.out.println("Error File Not Found");
                     return;
                 }
-            } else {
+            }
+            else {
                 //send each of the packets with arguments through the Gremlin function to
                 //determine whether to change some of the packet bit or pass the packet as it is to the receiving function
                 if (!Gremlin(GremlinProbability, createReceivedPacket)) { //if false packet lost -> do not run error detection
@@ -95,14 +96,17 @@ public class SR_UDPClient {
                         DatagramPacket sendNAK = new DatagramPacket(nakData, nakData.length, IPAddress, port);
                         clientSocket.send(sendNAK);
                     } else //if error not detected send ACK
+                    {
+                        i++;
                         receivedPackets.add(createReceivedPacket); //received packets are added to the packet array
-                    String ACK = "Sending ACK:" + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER); //request to be sent to Server
-                    System.out.println(ACK);
-                    byte[] ackData = ACK.getBytes(); //gets request in byte form
+                        String ACK = "Sending ACK:" + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER); //request to be sent to Server
+                        System.out.println(ACK);
+                        byte[] ackData = ACK.getBytes(); //gets request in byte form
 
-                    //sends ACK to server
-                    DatagramPacket sendACK = new DatagramPacket(ackData, ackData.length, IPAddress, port);
-                    clientSocket.send(sendACK);
+                        //sends ACK to server
+                        DatagramPacket sendACK = new DatagramPacket(ackData, ackData.length, IPAddress, port);
+                        clientSocket.send(sendACK);
+                    }
                 }
             }
         }

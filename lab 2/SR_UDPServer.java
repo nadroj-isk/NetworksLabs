@@ -83,8 +83,8 @@ public class SR_UDPServer {
 
             //////////////////////////////////////////////////////////////////////////////////////
             ArrayList<SR_Packet> PacketList = SR_Packet.Segmentation(HTTP_HeaderForm.getBytes()); //segments file into packets
-            ArrayList<String> ackedPackets = new ArrayList<>();
-            ArrayList<String> sentUnAckedPackets = new ArrayList<>();
+            ArrayList<SR_Packet> windowList = new ArrayList<>();
+
 
             ArrayList<Double> sendTimes = new ArrayList<>();
             ArrayList<Double> ackReceiveTime = new ArrayList<>();
@@ -98,25 +98,25 @@ public class SR_UDPServer {
             int packetNumber = 0;
             int windowBaseIndex = 0;
             while (packetNumber < PacketList.size()) {
-                if (windowBaseIndex < 8) { //once size hit...waits for ACKs{
+                while (windowList.size() < 8 && packetNumber < PacketList.size()) { //once size hit...waits for ACKs{
                     DatagramPacket sendPacket = PacketList.get(packetNumber).getDatagramPacket(IPAddress, portReceive);
                     serverSocket.send(sendPacket);
-                    sentUnAckedPackets.add(PacketList.get(packetNumber).getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER)); //adds packet to window
-                    System.out.println("Sending Packet " + packetNumber + " of 24");
+                    windowList.add(PacketList.get(packetNumber)); //adds packet to window
+                    System.out.println("Sending Packet " + (packetNumber % 24)+ " of 23");
                     sendTimes.add(getTimeInDouble());
-                    packetNumber = (packetNumber + 1) % 24;
+                    packetNumber = (packetNumber + 1);
                     windowBaseIndex++;
-                } else { //if window if filled loop until window empty
-                    while (windowBaseIndex > 0) {
+                }  { //if window if filled loop until window empty
+                    while (windowList.size() > 0) {
                         receiveData = new byte[512]; //create bytes for sending/receiving data
                         DatagramPacket clientResponse = new DatagramPacket(receiveData, receiveData.length); //Creates a new datagram
                         serverSocket.setSoTimeout(40); //TODO MARCUS
                         try {
                             serverSocket.receive(clientResponse);
                         } catch (SocketTimeoutException e) {
-                            DatagramPacket sendPacket = PacketList.get(packetNumber - 1).getDatagramPacket(IPAddress, portReceive);
+                            DatagramPacket sendPacket = windowList.get(0).getDatagramPacket(IPAddress, portReceive);
                             serverSocket.send(sendPacket);
-                            System.out.println("Re-Sending Lost Packet " + (packetNumber - 1) + " of " + PacketList.size());
+                            System.out.println("Re-Sending Lost Packet " + (windowList.get(0).getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER)) + " of 23");
                             sendTimes.add(getTimeInDouble());
                             continue;
                         }
@@ -125,31 +125,23 @@ public class SR_UDPServer {
                             String[] ackSplit = responseFromClient.split(":");
                             String ackNum = ackSplit[1];
                             System.out.println("Receiving ACK: " + ackNum);
-                            if (sentUnAckedPackets.contains(ackNum)) { //Packet now ACkd
-                                if (sentUnAckedPackets.get(0).equals(ackNum)) {
-                                    windowBaseIndex--;
-                                    int checkNum = Integer.parseInt(ackNum);
-                                    for (String packet : ackedPackets) {
-                                        if ((Integer.parseInt(packet) - 1) == checkNum) {
-                                            checkNum++;
-                                            ackedPackets.remove(packet);
-                                            windowBaseIndex--;
-                                        } else break;
-                                    }
-                                } else {
-                                    ackedPackets.add(ackNum);
-                                }
-                                sentUnAckedPackets.remove(ackNum);
+                            for(SR_Packet packet : windowList){
+                               if(packet.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER).trim().equals(ackNum)){
+                                   packet.acked();
+                                   break;
+                               }
+                            }
+                            while(windowList.size() > 0 && windowList.get(0).isAcked()){
+                                windowList.remove(0);
                             }
                         } else if (responseFromClient.contains("NAK")) { //receiving NAK
                             String[] nakSplit = responseFromClient.split(":");
                             String nakNum = nakSplit[1];
                             System.out.println("Receiving NAK: " + nakNum);
-                            if (sentUnAckedPackets.contains(nakNum) && windowBaseIndex <= 8) {
+                            if (windowList.size() <= 8) {
                                 DatagramPacket resendPacket = PacketList.get(Integer.parseInt(nakNum)).getDatagramPacket(IPAddress, portReceive);
                                 serverSocket.send(resendPacket);
-                                System.out.println("Re-Sending Packet " + nakNum + " of " + PacketList.size());
-                                windowBaseIndex++;
+                                System.out.println("Re-Sending Packet " + nakNum + " of 23");
                             }
                         }
                     }
@@ -158,6 +150,7 @@ public class SR_UDPServer {
 
             //Sends Null Packet to let host know transfer is over
             serverSocket.send(setNullPacket(IPAddress, portReceive));
+            return;
         }
     }
 

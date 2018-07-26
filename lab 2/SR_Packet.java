@@ -1,9 +1,12 @@
+import com.sun.xml.internal.ws.api.message.Header;
+import com.sun.xml.internal.ws.api.message.Packet;
+
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
-//
+
 /**
  * This class contains the methods used for packets including creating a packet, getting packet data,
  * getting/setting the packet header, getting/setting the packet segment number, segmentation, re-assembly,
@@ -20,13 +23,16 @@ class SR_Packet {
     //Private constant to map segment number and checksum
     private static final String HEADER_SEGMENT_NUMBER = "SegmentNumber";
     private static final String HEADER_CHECKSUM = "CheckSum";
+    private static final String HEADER_MODULO_NUMBER = "ModNum";
+
     //package data
-    private static int PACKET_SIZE = 256;  //Size of the packets to be sent
-    private static final int HEADER_LINES = 4;  //Number of header lines that go before the objects to be sent given in the lab assignment
+    private static int PACKET_SIZE = 512;  //Size of the packets to be sent
+    private static final int HEADER_LINES = 6;  //Number of header lines that go before the objects to be sent given in the lab assignment
     private static final int PACKET_DATA_SIZE = PACKET_SIZE - HEADER_LINES; //Size of the data that is transmitted in the packet
     private byte[] PackageData;
     //Map data dictionary that maps the header string to strings
     private Map<String, String> PacketHeader;
+    private boolean isAcked = false;
 
     //Constructor
     private SR_Packet() {
@@ -36,7 +42,13 @@ class SR_Packet {
         //Initialize Map using HashMap
         PacketHeader = new HashMap<>();
     }
+    public void acked(){
+        isAcked = true;
+    }
 
+    public boolean isAcked(){
+        return isAcked;
+    }
     //Reassemble Packet function called by the UDPClient. Takes in the list of segmented packets and re-assembles them.
     static byte[] ReassemblePacket(ArrayList<SR_Packet> PacketList) {
         int totalSize = 0;
@@ -50,8 +62,10 @@ class SR_Packet {
             for (SR_Packet FindPacket : PacketList) {
             	//gets packet by segment number
                 String segmentNumber = FindPacket.getHeaderValue(HEADER_ELEMENTS.SEGMENT_NUMBER);
+                String moduloNumber = FindPacket.getHeaderValue(HEADER_ELEMENTS.MODULO_NUMBER);
+                int finalNumber = Integer.parseInt(segmentNumber) + (24 * Integer.parseInt(moduloNumber));
                 //gets the packet data size and data that match the segment number found
-                if (Integer.parseInt(segmentNumber) == i) {
+                if (finalNumber == i) {
                     for (int k = 0; k < FindPacket.getPacketDataSize(); k++)
                         returnPacket[returnCounter + k] = FindPacket.GETPacketData(k);
                     returnCounter += FindPacket.getPacketDataSize();
@@ -75,13 +89,15 @@ class SR_Packet {
         }
         int byteCounter = 0;
         int segmentNumber = 0;
+        int modCounter = 0;
+        int index = 0;
         //checks the fileLength against the byte counter.
         //As long as the byteCounter is less than the file length a new SR_Packet will be created of size 252
         while (byteCounter < fileLength) {
             SR_Packet nextPacket = new SR_Packet();
             byte[] nextPacketData = new byte[PACKET_DATA_SIZE];
-            //read in amount of data size 256 (total) - 4 (header) = 252 (data)
-            int readInDataSize = PACKET_DATA_SIZE; //only allows 252 bytes since the other 4 are for the header
+            //read in amount of data size 512 (total) - 6 (header) = 506 (data)
+            int readInDataSize = PACKET_DATA_SIZE; //only allows 506 bytes since the other 4 are for the header
             //as long as the file length - the number of bytes counted is less than 252
             //then more data is added to the packet segment
             if (fileLength - byteCounter < PACKET_DATA_SIZE) {
@@ -99,13 +115,15 @@ class SR_Packet {
 
             //set the header for the next packet
             nextPacket.setHeaderValue(HEADER_ELEMENTS.SEGMENT_NUMBER, segmentNumber + "");
-
+            nextPacket.setHeaderValue(HEADER_ELEMENTS.MODULO_NUMBER, modCounter + "");
             //CheckSum (errors)
             String CheckSumPacket = String.valueOf(SR_Packet.CheckSum(nextPacketData));
             nextPacket.setHeaderValue(HEADER_ELEMENTS.CHECKSUM, CheckSumPacket);
             returnPacket.add(nextPacket);
 
             //increase the segment number
+            index++;
+            modCounter = (index) / 24;
             segmentNumber = (segmentNumber + 1) % 24 ;
 
             //increase the counter by the amount read in
@@ -121,6 +139,7 @@ class SR_Packet {
         ByteBuffer bytebuffer = ByteBuffer.wrap(packet.getData()); //wraps the byte array into the buffer
         newPacket.setHeaderValue(HEADER_ELEMENTS.SEGMENT_NUMBER, bytebuffer.getShort() + ""); //sets header segment number
         newPacket.setHeaderValue(HEADER_ELEMENTS.CHECKSUM, bytebuffer.getShort() + ""); //sets header checksum
+        newPacket.setHeaderValue(HEADER_ELEMENTS.MODULO_NUMBER, bytebuffer.getShort() + "");
         byte[] PacketData = packet.getData(); //gets the packet data
         byte[] remaining = new byte[PacketData.length - bytebuffer.position()]; //subtracts the package data length from the byte buffer position
         //copies  an array from the specified source array, beginning at the specified position, to the specified position of the destination array
@@ -168,6 +187,8 @@ class SR_Packet {
                 return PacketHeader.get(HEADER_SEGMENT_NUMBER);
             case CHECKSUM:
                 return PacketHeader.get(HEADER_CHECKSUM);
+            case MODULO_NUMBER:
+                return PacketHeader.get(HEADER_MODULO_NUMBER);
             default:
                 throw new IllegalArgumentException("Something is broken... bad broken");
         }
@@ -184,6 +205,9 @@ class SR_Packet {
                 break;
             case CHECKSUM:
                 PacketHeader.put(HEADER_CHECKSUM, HeaderValue);
+                break;
+            case MODULO_NUMBER:
+                PacketHeader.put(HEADER_MODULO_NUMBER, HeaderValue);
                 break;
             default:
                 throw new IllegalArgumentException("Something is broken... bad broken");
@@ -225,9 +249,10 @@ class SR_Packet {
 
     //returns packet as a datagram packet
     DatagramPacket getDatagramPacket(InetAddress i, int port) {
-        byte[] setData = ByteBuffer.allocate(256)
+        byte[] setData = ByteBuffer.allocate(512)
                 .putShort(Short.parseShort(PacketHeader.get(HEADER_SEGMENT_NUMBER)))
                 .putShort(Short.parseShort(PacketHeader.get(HEADER_CHECKSUM)))
+                .putShort(Short.parseShort(PacketHeader.get(HEADER_MODULO_NUMBER)))
                 .put(PackageData)
                 .array();
 
@@ -237,6 +262,7 @@ class SR_Packet {
     //declaring enum Header_Elements for key/value pairs
     public enum HEADER_ELEMENTS {
         SEGMENT_NUMBER,
-        CHECKSUM
+        CHECKSUM,
+        MODULO_NUMBER
     }
 }
