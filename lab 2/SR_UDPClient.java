@@ -20,7 +20,7 @@ import java.util.Random;
  */
 public class SR_UDPClient {
 
-    private static final String IPADDRESSOFSERVER = "172.19.146.2";
+    private static final String IPADDRESSOFSERVER = "131.204.14.51";
 
     public static void main(String args[]) throws Exception {
 
