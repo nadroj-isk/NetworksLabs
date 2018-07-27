@@ -1,6 +1,3 @@
-import com.sun.xml.internal.ws.api.message.Header;
-import com.sun.xml.internal.ws.api.message.Packet;
-
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -24,10 +21,9 @@ class SR_Packet {
     private static final String HEADER_SEGMENT_NUMBER = "SegmentNumber";
     private static final String HEADER_CHECKSUM = "CheckSum";
     private static final String HEADER_MODULO_NUMBER = "ModNum";
-
+    private static final int HEADER_LINES = 6;  //Number of header lines that go before the objects to be sent given in the lab assignment
     //package data
     private static int PACKET_SIZE = 512;  //Size of the packets to be sent
-    private static final int HEADER_LINES = 6;  //Number of header lines that go before the objects to be sent given in the lab assignment
     private static final int PACKET_DATA_SIZE = PACKET_SIZE - HEADER_LINES; //Size of the data that is transmitted in the packet
     private byte[] PackageData;
     //Map data dictionary that maps the header string to strings
@@ -42,15 +38,10 @@ class SR_Packet {
         //Initialize Map using HashMap
         PacketHeader = new HashMap<>();
     }
-    public void acked(){
-        isAcked = true;
-    }
 
-    public boolean isAcked(){
-        return isAcked;
-    }
     //Reassemble Packet function called by the UDPClient. Takes in the list of segmented packets and re-assembles them.
     static byte[] ReassemblePacket(ArrayList<SR_Packet> PacketList) {
+        ArrayList<SR_Packet> arrangePackets = new ArrayList<>();
         int totalSize = 0;
         //gets packet data size for each of the segmented packets
         for (SR_Packet aPacketList : PacketList) totalSize += aPacketList.getPacketDataSize();
@@ -60,7 +51,7 @@ class SR_Packet {
         for (int i = 0; i < PacketList.size(); i++) {
             //Search the packetList for each packet
             for (SR_Packet FindPacket : PacketList) {
-            	//gets packet by segment number
+                //gets packet by segment number
                 String segmentNumber = FindPacket.getHeaderValue(HEADER_ELEMENTS.SEGMENT_NUMBER);
                 String moduloNumber = FindPacket.getHeaderValue(HEADER_ELEMENTS.MODULO_NUMBER);
                 int finalNumber = Integer.parseInt(segmentNumber) + (24 * Integer.parseInt(moduloNumber));
@@ -69,6 +60,7 @@ class SR_Packet {
                     for (int k = 0; k < FindPacket.getPacketDataSize(); k++)
                         returnPacket[returnCounter + k] = FindPacket.GETPacketData(k);
                     returnCounter += FindPacket.getPacketDataSize();
+                    arrangePackets.add(FindPacket);
                     break;
                 }
             }
@@ -79,7 +71,7 @@ class SR_Packet {
 
     //Segmentation is called by the UDPServer to break the packets into segments
     static ArrayList<SR_Packet> Segmentation(byte[] fileBytes) {
-    	//creates an empty array list for the newly segmented packets
+        //creates an empty array list for the newly segmented packets
         ArrayList<SR_Packet> returnPacket = new ArrayList<>();
         //gets the fileBytes length
         int fileLength = fileBytes.length;
@@ -124,7 +116,7 @@ class SR_Packet {
             //increase the segment number
             index++;
             modCounter = (index) / 24;
-            segmentNumber = (segmentNumber + 1) % 24 ;
+            segmentNumber = (segmentNumber + 1) % 24;
 
             //increase the counter by the amount read in
             byteCounter = byteCounter + readInDataSize;
@@ -148,8 +140,6 @@ class SR_Packet {
         return newPacket; //returns the newly created packet
     }
 
-    /////////////////////////PACKAGE HEADER METHODS//////////////////////////////////
-
     //Check sum function that return the 16 bit checkSum value for a packet
     static short CheckSum(byte[] packetBytes) {
         long sum = 0;
@@ -157,7 +147,7 @@ class SR_Packet {
         int packetByteLength = packetBytes.length;
         int count = 0;
         while (packetByteLength > 1) { //while the length is greater than 1 then the bits will be shifted left
-        	//get the packetByte in the array of the count shift it left 8 bits
+            //get the packetByte in the array of the count shift it left 8 bits
             sum += ((packetBytes[count]) << 8 & 0xFF00) | ((packetBytes[count + 1]) & 0x00FF);
             //if a carry occurred then it is wrapped around
             if ((sum & 0xFFFF0000) > 0) {
@@ -179,6 +169,15 @@ class SR_Packet {
         return (short) (~sum & 0xFFFF);
     }
 
+    void acked() {
+        isAcked = true;
+    }
+
+    /////////////////////////PACKAGE HEADER METHODS//////////////////////////////////
+
+    boolean isAcked() {
+        return isAcked;
+    }
 
     //Get Header Element Values
     String getHeaderValue(HEADER_ELEMENTS HeaderElements) {

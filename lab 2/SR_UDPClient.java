@@ -20,14 +20,14 @@ import java.util.Random;
  */
 public class SR_UDPClient {
 
-    static final String IPADDRESSOFSERVER = "172.19.146.2";
+    private static final String IPADDRESSOFSERVER = "172.19.146.2";
 
     public static void main(String args[]) throws Exception {
 
         int[] ports = {10028, 10029, 10030, 10031}; //Group Assigned Port Numbers
         int port = ports[0];
 
-        DatagramSocket clientSocket = new DatagramSocket();        //creates socket for user
+        DatagramSocket clientSocket = new DatagramSocket();                  //creates socket for user
         InetAddress IPAddress = InetAddress.getByName(IPADDRESSOFSERVER);    //gets IP address of Server
 
         byte[] sendData;    //creates packet to be sent
@@ -62,16 +62,17 @@ public class SR_UDPClient {
 
         DatagramPacket receivePacket; //Declares the Datagram packet for receive packet
         ArrayList<SR_Packet> receivedPackets = new ArrayList<>(); //create a new array of packets received
-        int i = 0;
         while (!DataDoneSending) { //check to see if the data is done sending to host
 
             receivePacket = new DatagramPacket(receiveData, receiveData.length); //creates a null datagram packet
             clientSocket.receive(receivePacket); //receives the actual packet from the server
             //create a packet from the data received
+            if(packetNumber == 30){
+                System.out.println("HI");
+            }
             SR_Packet createReceivedPacket = SR_Packet.CreatePacket(receivePacket);
-            packetNumber++;
 
-            System.out.println("Receiving Packet #: " + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
+            System.out.println("Receiving Packet: " + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
             //checks to see if the packet data is null
             //if it is then that means the data is done sending and it will break out of the loop
             if (createReceivedPacket.GETPacketData()[0] == '\0') {
@@ -80,10 +81,10 @@ public class SR_UDPClient {
                     System.out.println("Error File Not Found");
                     return;
                 }
-            }
-            else {
+            } else {
                 //send each of the packets with arguments through the Gremlin function to
                 //determine whether to change some of the packet bit or pass the packet as it is to the receiving function
+
                 if (!Gremlin(GremlinProbability, createReceivedPacket)) { //if false packet lost -> do not run error detection
                     //Check for error detection in the received packets
                     if (ErrorDetection(createReceivedPacket)) { //if error detected send NAK
@@ -95,12 +96,11 @@ public class SR_UDPClient {
                         //sends NAK to the serverSocket
                         DatagramPacket sendNAK = new DatagramPacket(nakData, nakData.length, IPAddress, port);
                         clientSocket.send(sendNAK);
-                    } else //if error not detected send ACK
-                    {
-                        i++;
+                    } else{//if error not detected send ACK
                         receivedPackets.add(createReceivedPacket); //received packets are added to the packet array
                         String ACK = "Sending ACK:" + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER); //request to be sent to Server
                         System.out.println(ACK);
+                        packetNumber++;
                         byte[] ackData = ACK.getBytes(); //gets request in byte form
 
                         //sends ACK to server
@@ -108,10 +108,14 @@ public class SR_UDPClient {
                         clientSocket.send(sendACK);
                     }
                 }
+                else{
+                    System.out.println("Packet Lost: " + createReceivedPacket.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER));
+                }
             }
         }
 
         //Reassembles Packets that were received
+        ArrayList<SR_Packet> arrangedPackets = new ArrayList<>();
         byte[] ReassemblePacketFile = SR_Packet.ReassemblePacket(receivedPackets);
         String modifiedPacketData = new String(ReassemblePacketFile);
         System.out.println("Packet Data Received from UDPServer:\n" + modifiedPacketData);
