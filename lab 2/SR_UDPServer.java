@@ -2,10 +2,9 @@ import java.io.File;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
 import java.util.Scanner;
-import java.net.SocketTimeoutException;
-import java.lang.Math;
 
 /**
  * UDPServer Class
@@ -18,14 +17,13 @@ import java.lang.Math;
  */
 public class SR_UDPServer {
 
-    static final double ALPHA = .125;
-    static final double BETA = .25;
+    private static final double ALPHA = .125;
+    private static final double BETA = .25;
 
     public static void main(String args[]) throws Exception {
 
         int[] ports = {10028, 10029, 10030, 10031}; //list of port numbers assigned to our group to use
         int port = ports[0];
-        final int WINDOWSIZE = 8;
         System.out.print("Getting IP Address..."); //remove later
         String localhost = InetAddress.getLocalHost().getHostAddress().trim();  //grabs IP to use for Client
         System.out.println("\nConnected to: " + localhost); //prints out the Server IP
@@ -87,32 +85,30 @@ public class SR_UDPServer {
 
 
             ArrayList<Double> sendTimes = new ArrayList<>();
-            ArrayList<Double> sampRTT = new ArrayList<>();
-            sampRTT.add(0);
             ArrayList<Double> ackReceiveTime = new ArrayList<>();
             ArrayList<Double> estRTT = new ArrayList<>();
             estRTT.add(40.0);
             ArrayList<Double> devRTT = new ArrayList<>();
             devRTT.add(0.0);
             ArrayList<Double> timeoutRTT = new ArrayList<>();
-            timeoutRTT.add(40);
-            int packetNumToBeAcked = 0;
+            timeoutRTT.add(calculateTimeoutRtt(0, estRTT.get(0), devRTT.get(0)));
+
             int packetNumber = 0;
-            int windowBaseIndex = 0;
+
             while (packetNumber < PacketList.size()) {
                 while (windowList.size() < 8 && packetNumber < PacketList.size()) { //once size hit...waits for ACKs{
                     DatagramPacket sendPacket = PacketList.get(packetNumber).getDatagramPacket(IPAddress, portReceive);
                     serverSocket.send(sendPacket);
                     windowList.add(PacketList.get(packetNumber)); //adds packet to window
-                    System.out.println("Sending Packet " + (packetNumber % 24)+ " of 23");
+                    System.out.println("Sending Packet " + (packetNumber % 24) + " of 23");
                     sendTimes.add(getTimeInDouble());
                     packetNumber = (packetNumber + 1);
-                    windowBaseIndex++;
-                }  { //if window if filled loop until window empty
+                }
+                { //if window if filled loop until window empty
                     while (windowList.size() > 0) {
                         receiveData = new byte[512]; //create bytes for sending/receiving data
                         DatagramPacket clientResponse = new DatagramPacket(receiveData, receiveData.length); //Creates a new datagram
-                        serverSocket.setSoTimeout(timeoutRTT.get(packetNumToBeAcked)); //TODO MARCUS
+                        serverSocket.setSoTimeout(40); //TODO Marcus
                         try {
                             serverSocket.receive(clientResponse);
                         } catch (SocketTimeoutException e) {
@@ -124,32 +120,19 @@ public class SR_UDPServer {
                         }
                         String responseFromClient = new String(clientResponse.getData()).trim();
                         if (responseFromClient.contains("ACK")) { //receiving ACK
-
-                          // Uses the time the ACK was received to calculate a sample time and then calculate the new timeout time from the sample time.
-                            ackReceiveTime.add(getTimeInDouble);
-                            sampRTT.add(sendTimes.get(packetNumToBeAcked) - timeAcked);
-                            calculateTimeoutRtt(packetNumToBeAcked);
-                            packetNumToBeAcked++
-                          //
                             String[] ackSplit = responseFromClient.split(":");
                             String ackNum = ackSplit[1];
                             System.out.println("Receiving ACK: " + ackNum);
-                            for(SR_Packet packet : windowList){
-                               if(packet.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER).trim().equals(ackNum)){
-                                   packet.acked();
-                                   break;
-                               }
+                            for (SR_Packet packet : windowList) {
+                                if (packet.getHeaderValue(SR_Packet.HEADER_ELEMENTS.SEGMENT_NUMBER).trim().equals(ackNum)) {
+                                    packet.acked();
+                                    break;
+                                }
                             }
-                            while(windowList.size() > 0 && windowList.get(0).isAcked()){
+                            while (windowList.size() > 0 && windowList.get(0).isAcked()) {
                                 windowList.remove(0);
                             }
-                        } else if (responseFromClient.contains("NAK")) { //receiving NAK
-
-                            ackReceiveTime.add(getTimeInDouble);
-                            sampRTT.add(sendTimes.get(packetNumToBeAcked) - timeAcked);
-                            calculateTimeoutRtt(packetNumToBeAcked);
-                            timeoutRTT.set(packetNumToBeAcked, 40);
-
+                        } else if (responseFromClient.contains("NAK")) { //receiving NAK //TODO this is where the error is
                             String[] nakSplit = responseFromClient.split(":");
                             String nakNum = nakSplit[1];
                             System.out.println("Receiving NAK: " + nakNum);
@@ -185,25 +168,19 @@ public class SR_UDPServer {
         return nullDatagram;
     }
 
-    private static void calculateEstRtt(int packNum) {
-        estRTT.add((1 - ALPHA) * estRTT.get(packNum) + ALPHA * sampRTT.get(packNum));
-        return;
+    private static double calculateEstRtt(double sampRttIn, double estRttIn) {
+        return (1 - ALPHA) * estRttIn + ALPHA * sampRttIn;
     }
 
-    private static void calculateDevRtt(int packNum) {
-        devRTT.add((1 - BETA) * devRTT.get(packNum) + BETA * Math.abs(sampRTT.get(packNum) + devRTT.get(packNum)));
-        return;
+    private static double calculateDevRtt(double sampRttIn, double devRttIn) {
+        return (1 - BETA) * devRttIn + BETA * Math.abs(sampRttIn + devRttIn);
     }
 
-    private static void calculateTimeoutRtt(int packNum) {
-        calculateEstRtt(packNum);
-        calculateDevRtt(packNum);
-        timeoutRTT.add(estRTT.get(packNum + 1) + 4 * devRTT.get(packNum + 1));
-        return;
+    private static double calculateTimeoutRtt(double sampRttIn, double estRttIn, double devRttIn) {
+        return calculateEstRtt(sampRttIn, estRttIn) + 4 * calculateDevRtt(sampRttIn, devRttIn);
     }
 
     private static double getTimeInDouble() {
-        double timeInDouble = Double.parseDouble(Long.toString(System.currentTimeMillis()));
-        return timeInDouble;
+        return Double.parseDouble(Long.toString(System.currentTimeMillis()));
     }
 }
